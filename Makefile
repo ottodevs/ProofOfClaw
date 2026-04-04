@@ -20,6 +20,21 @@ test-contracts:
 deploy-contracts:
 	cd contracts && forge script script/Deploy.s.sol --rpc-url $(RPC_URL) --broadcast
 
+deploy-0g-testnet:
+	cd contracts && forge script script/Deploy0G.s.sol \
+		--rpc-url https://evmrpc-testnet.0g.ai \
+		--broadcast --evm-version cancun
+
+deploy-0g-mainnet:
+	cd contracts && forge script script/Deploy0G.s.sol \
+		--rpc-url https://evmrpc.0g.ai \
+		--broadcast --evm-version cancun
+
+deploy-sepolia:
+	cd contracts && forge script script/Deploy.s.sol \
+		--rpc-url $(SEPOLIA_RPC_URL) \
+		--broadcast --verify
+
 run-agent:
 	cd agent && cargo run
 
