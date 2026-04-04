@@ -862,6 +862,7 @@ tr:hover td { background: rgba(255,255,255,0.015); }
   <div class="sidebar-divider"></div>
   <div class="sidebar-section">
     <div class="sidebar-label">Reference</div>
+    <a href="#agent-api-spec" class="sidebar-link">Agent API Spec</a>
     <a href="#config" class="sidebar-link">Configuration</a>
     <a href="#repo-structure" class="sidebar-link">Repository Structure</a>
     <a href="#bounties" class="sidebar-link">Target Bounties</a>
@@ -1296,6 +1297,218 @@ tr:hover td { background: rgba(255,255,255,0.015); }
   <li><strong>Injection Detector</strong> &mdash; Detects and blocks prompt injection attempts before they reach the LLM</li>
   <li><strong>WASM Sandbox</strong> &mdash; Untrusted tools execute in isolated Wasmtime containers with capability-based permissions</li>
 </ul>
+
+<!-- AGENT API SPEC -->
+<h2 id="agent-api-spec" class="section-anchor fade-in"><span class="section-icon icon-green">&#x2B23;</span> Agent API Spec</h2>
+<p class="fade-in">Any agent that implements these endpoints can connect to Proof of Claw. Build your agent in Python, Node, Go, Rust, or any language.</p>
+
+<h3 class="fade-in" style="margin-top:24px;">Required Endpoints</h3>
+<p class="fade-in" style="font-size:13px;color:var(--text-secondary);">Your agent <strong>must</strong> implement these two endpoints to be connectable.</p>
+
+<div class="code-block fade-in">
+<div class="code-header"><span>GET /health</span></div>
+<pre><code>// Health check — return 200 OK
+// No body required. Used for liveness checks.
+
+curl http://localhost:8420/health
+// Response: 200 OK</code></pre>
+</div>
+
+<div class="code-block fade-in">
+<div class="code-header"><span>GET /api/status</span></div>
+<pre><code>// Returns agent identity, configuration, and statistics
+
+// Response shape:
+{
+  "agent_id": "my-agent",
+  "ens_name": "my-agent.proofclaw.eth",
+  "status": "online",
+  "network": "sepolia",
+  "allowed_tools": ["swap_tokens", "transfer", "query"],
+  "endpoint_allowlist": ["https://api.uniswap.org"],
+  "max_value_autonomous_wei": "1000000000000000000",
+  "uptime_secs": 3600,
+  "stats": {
+    "total_actions": 42,
+    "proofs_generated": 15
+  }
+}</code></pre>
+</div>
+
+<h3 class="fade-in" style="margin-top:24px;">Chat Endpoint</h3>
+<p class="fade-in" style="font-size:13px;color:var(--text-secondary);">Required for the chat interface. This is where the agent processes user messages.</p>
+
+<div class="code-block fade-in">
+<div class="code-header"><span>POST /api/chat</span></div>
+<pre><code>// Request:
+{ "message": "swap 100 USDC for ETH" }
+
+// Response:
+{
+  "response": "Executing swap: 100 USDC for ETH. Policy verified.",
+  "intent": {
+    "action_type": "swap",       // "swap" | "transfer" | "query" | "unknown"
+    "confidence": 0.95
+  },
+  "policy_result": {
+    "allowed": true,
+    "approval_type": "autonomous", // "autonomous" | "ledger_gated"
+    "checks": [
+      { "rule_id": "tool_allowlist", "severity": "Pass", "details": "swap_tokens allowed" },
+      { "rule_id": "value_threshold", "severity": "Pass", "details": "within limit" }
+    ]
+  },
+  "proof": {
+    "proof_id": "0xabcd...",
+    "status": "verified",
+    "output_commitment": "0x1234..."
+  }
+}</code></pre>
+</div>
+
+<h3 class="fade-in" style="margin-top:24px;">Optional Endpoints</h3>
+<p class="fade-in" style="font-size:13px;color:var(--text-secondary);">These enable full dashboard, proofs, and messaging integration.</p>
+
+<div class="code-block fade-in">
+<div class="code-header"><span>GET /api/activity</span></div>
+<pre><code>// Returns activity feed
+[
+  {
+    "id": "act-001",
+    "timestamp": 1712234567,
+    "type": "proof_generated",     // "proof_generated" | "message_received" | "policy_violation"
+    "title": "Swap executed autonomously",
+    "description": "Swapped 100 USDC for ETH",
+    "severity": "info"             // "info" | "warning" | "error"
+  }
+]</code></pre>
+</div>
+
+<div class="code-block fade-in">
+<div class="code-header"><span>GET /api/proofs</span></div>
+<pre><code>// Returns proof history
+[
+  {
+    "proof_id": "0xabcd...",
+    "timestamp": 1712234567,
+    "agent_id": "my-agent",
+    "action": "swap_tokens",
+    "status": "verified",
+    "output_commitment": "0x1234...",
+    "policy_checks": {
+      "tool_allowlist": "Pass",
+      "endpoint_restriction": "Pass",
+      "value_threshold": "Pass"
+    }
+  }
+]</code></pre>
+</div>
+
+<div class="code-block fade-in">
+<div class="code-header"><span>GET /api/messages &amp; POST /api/messages/send</span></div>
+<pre><code>// GET /api/messages — Returns message records
+[
+  {
+    "id": "msg-001",
+    "from": "my-agent",
+    "to": "other-agent.proofclaw.eth",
+    "content": "Hello, want to collaborate?",
+    "timestamp": 1712234567,
+    "direction": "outbound"
+  }
+]
+
+// POST /api/messages/send
+// Request: { "to": "bob.proofclaw.eth", "content": "Hello!" }
+// Response: { "success": true, "message_id": "msg-002", "timestamp": 1712234567 }</code></pre>
+</div>
+
+<h3 class="fade-in" style="margin-top:24px;">CORS Requirements</h3>
+<p class="fade-in" style="font-size:13px;color:var(--text-secondary);">Since the Proof of Claw frontend is a static site, your agent must return CORS headers:</p>
+<div class="code-block fade-in">
+<div class="code-header"><span>Required Headers</span></div>
+<pre><code>Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type</code></pre>
+</div>
+
+<h3 class="fade-in" style="margin-top:24px;">Minimal Agent Examples</h3>
+
+<div class="code-block fade-in">
+<div class="code-header"><span>Python (Flask)</span></div>
+<pre><code>from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/health')
+def health():
+    return 'ok'
+
+@app.route('/api/status')
+def status():
+    return jsonify({
+        'agent_id': 'my-python-agent',
+        'ens_name': 'my-agent.proofclaw.eth',
+        'status': 'online',
+        'network': 'sepolia',
+        'allowed_tools': ['query'],
+        'endpoint_allowlist': [],
+        'max_value_autonomous_wei': '0',
+        'uptime_secs': 0,
+        'stats': {'total_actions': 0, 'proofs_generated': 0}
+    })
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    msg = request.json.get('message', '')
+    return jsonify({
+        'response': f'You said: {msg}',
+        'intent': {'action_type': 'query', 'confidence': 0.8},
+        'policy_result': {'allowed': True, 'approval_type': 'autonomous', 'checks': []},
+        'proof': {'proof_id': '0x0', 'status': 'pending', 'output_commitment': '0x0'}
+    })
+
+app.run(port=8420)</code></pre>
+</div>
+
+<div class="code-block fade-in">
+<div class="code-header"><span>Node.js (Express)</span></div>
+<pre><code>const express = require('express');
+const cors = require('cors');
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get('/health', (req, res) =&gt; res.send('ok'));
+
+app.get('/api/status', (req, res) =&gt; res.json({
+  agent_id: 'my-node-agent',
+  ens_name: 'my-agent.proofclaw.eth',
+  status: 'online',
+  network: 'sepolia',
+  allowed_tools: ['query'],
+  endpoint_allowlist: [],
+  max_value_autonomous_wei: '0',
+  uptime_secs: 0,
+  stats: { total_actions: 0, proofs_generated: 0 }
+}));
+
+app.post('/api/chat', (req, res) =&gt; res.json({
+  response: `You said: ${req.body.message}`,
+  intent: { action_type: 'query', confidence: 0.8 },
+  policy_result: { allowed: true, approval_type: 'autonomous', checks: [] },
+  proof: { proof_id: '0x0', status: 'pending', output_commitment: '0x0' }
+}));
+
+app.listen(8420);</code></pre>
+</div>
+
+<div style="background:rgba(0,229,255,0.06);border:1px solid var(--border-cyan);border-radius:8px;padding:16px;margin:20px 0;" class="fade-in">
+  <strong style="color:var(--cyan);">Minimum Viable Agent:</strong>
+  <span style="color:var(--text-secondary);font-size:13px;">Implement <code>/health</code>, <code>/api/status</code>, and <code>/api/chat</code> to connect and chat. All other endpoints are optional and enable additional features (dashboard activity, proofs explorer, messaging).</span>
+</div>
 
 <!-- CONFIG -->
 <h2 id="config" class="section-anchor fade-in"><span class="section-icon icon-cyan">&#x2699;</span> Configuration</h2>

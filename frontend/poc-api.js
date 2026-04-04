@@ -57,8 +57,40 @@ const PocAPI = (() => {
     return r.ok;
   }
 
+  // ── Spec validation ──
+  async function validateSpec(baseUrl) {
+    const results = {};
+    const check = async (name, method, path, body) => {
+      try {
+        const opts = { method, signal: AbortSignal.timeout(5000) };
+        if (body) {
+          opts.headers = { 'Content-Type': 'application/json' };
+          opts.body = JSON.stringify(body);
+        }
+        const r = await fetch(`${baseUrl}${path}`, opts);
+        if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+        const contentType = r.headers.get('content-type') || '';
+        const data = contentType.includes('json') ? await r.json() : null;
+        return { ok: true, data };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    };
+
+    results.health = await check('health', 'GET', '/health');
+    results.status = await check('status', 'GET', '/api/status');
+    results.activity = await check('activity', 'GET', '/api/activity');
+    results.proofs = await check('proofs', 'GET', '/api/proofs');
+    results.messages = await check('messages', 'GET', '/api/messages');
+    // Skip /api/chat — don't auto-send a message during validation
+
+    results.valid = results.health.ok && results.status.ok;
+    results.agentPreview = results.status.ok ? results.status.data : null;
+    return results;
+  }
+
   // ── Connect flow ──
-  async function connect(url) {
+  async function connect(url, origin) {
     // Normalize URL
     let baseUrl = url.replace(/\/+$/, '');
     if (!baseUrl.startsWith('http')) baseUrl = 'http://' + baseUrl;
@@ -82,7 +114,7 @@ const PocAPI = (() => {
     setConnection(conn);
 
     // Sync agent into poc_agents list
-    syncLiveAgent(status);
+    syncLiveAgent(status, origin || 'connected');
 
     return conn;
   }
@@ -103,7 +135,7 @@ const PocAPI = (() => {
   }
 
   // ── Sync live agent data into localStorage agents ──
-  function syncLiveAgent(status) {
+  function syncLiveAgent(status, origin) {
     let agents = getAgents();
     const idx = agents.findIndex(a => a.id === status.agent_id);
     const agentObj = {
@@ -119,8 +151,9 @@ const PocAPI = (() => {
       endpoints: (status.endpoint_allowlist || []).join(', '),
       status: 'online',
       live: true,
+      origin: origin || 'connected',
       deployedAt: new Date().toISOString(),
-      description: 'Live OpenClaw agent connected via API',
+      description: 'Live agent connected via API',
       stats: {
         actions: status.stats?.total_actions || 0,
         proofs: status.stats?.proofs_generated || 0,
@@ -419,6 +452,7 @@ const PocAPI = (() => {
     fetchMessages,
     sendMessage,
     healthCheck,
+    validateSpec,
     showConnectModal,
     hideConnectModal,
     doConnect,

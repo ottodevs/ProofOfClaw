@@ -1386,7 +1386,9 @@
     <button class="filter-btn" data-filter="busy" onclick="setFilter('busy', this)">Busy</button>
     <button class="filter-btn" data-filter="offline" onclick="setFilter('offline', this)">Offline</button>
     <button class="btn-new-agent-top" onclick="lookupENS()" style="background:transparent;border:1px solid var(--border-cyan);color:var(--cyan);">Lookup ENS</button>
-    <a href="soul-vault.html" class="btn-new-agent-top">New Agent +</a>
+    <button class="btn-new-agent-top" onclick="openConnectModal()" style="background:transparent;border:1px solid rgba(0,230,118,0.4);color:var(--green);">Connect Agent</button>
+    <a href="soul-vault.html" class="btn-new-agent-top" style="background:transparent;border:1px solid rgba(187,134,252,0.4);color:#bb86fc;">Register</a>
+    <a href="soul-vault.html?mode=deploy" class="btn-new-agent-top">Deploy</a>
   </div>
 
   <!-- Agent Grid -->
@@ -1395,9 +1397,13 @@
   <!-- Empty State -->
   <div class="empty-state" id="empty-state" style="display:none;">
     <div class="empty-icon">&#x27C1;</div>
-    <h2>No agents deployed yet</h2>
-    <p>Deploy your first autonomous AI agent with cryptographic proof of behavior.</p>
-    <a href="soul-vault.html" class="btn-deploy-first" style="display:inline-block;text-decoration:none;">Deploy Your First Agent</a>
+    <h2>No agents yet</h2>
+    <p>Get started by registering, deploying, or connecting an agent.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
+      <a href="soul-vault.html" class="btn-deploy-first" style="display:inline-block;text-decoration:none;background:rgba(187,134,252,0.15);border:1px solid rgba(187,134,252,0.4);color:#bb86fc;">Register Identity</a>
+      <a href="soul-vault.html?mode=deploy" class="btn-deploy-first" style="display:inline-block;text-decoration:none;">Deploy IronClaw</a>
+      <button class="btn-deploy-first" onclick="openConnectModal()" style="background:rgba(0,230,118,0.15);border:1px solid rgba(0,230,118,0.4);color:var(--green);">Connect Agent</button>
+    </div>
   </div>
 
 </main>
@@ -1606,6 +1612,49 @@
   </div>
 </div>
 
+<!-- ═══════ CONNECT AGENT MODAL ═══════ -->
+<div class="modal-overlay" id="connect-agent-modal" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h2>Connect External Agent</h2>
+      <button class="modal-close" onclick="closeConnectModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px;line-height:1.6;">
+        Connect any agent that implements the <a href="docs.html#agent-api-spec" style="color:var(--cyan);">Proof of Claw Agent API</a>.
+        Works with Python, Node, Go, Rust, or any framework.
+      </p>
+      <div class="form-group">
+        <label>Agent API URL</label>
+        <input type="text" id="connect-url-input" placeholder="http://localhost:8420" autocomplete="url"
+               style="width:100%;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:var(--font-mono);font-size:13px;">
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Default port is 8420. Your agent must have CORS enabled.</div>
+      </div>
+
+      <!-- Validation Results -->
+      <div id="connect-validation" style="display:none;margin-top:16px;">
+        <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Endpoint Validation</div>
+        <div id="connect-checklist" style="display:flex;flex-direction:column;gap:4px;"></div>
+      </div>
+
+      <!-- Agent Preview -->
+      <div id="connect-preview" style="display:none;margin-top:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+        <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Agent Preview</div>
+        <div id="connect-preview-content"></div>
+      </div>
+
+      <!-- Error -->
+      <div id="connect-error" style="display:none;margin-top:12px;padding:10px 14px;background:rgba(255,61,90,0.08);border:1px solid rgba(255,61,90,0.3);border-radius:6px;color:#ff3d5a;font-size:12px;"></div>
+
+      <div style="display:flex;gap:8px;margin-top:20px;">
+        <button id="connect-validate-btn" class="btn-wizard btn-wizard-next" style="flex:1;padding:10px;font-size:13px;" onclick="doValidateAgent()">Validate</button>
+        <button id="connect-confirm-btn" class="btn-wizard btn-wizard-next" style="flex:1;padding:10px;font-size:13px;background:linear-gradient(135deg,var(--green),#00c853);display:none;" onclick="doConfirmConnect()" disabled>Connect</button>
+        <button class="btn-wizard btn-wizard-back" style="padding:10px 20px;font-size:13px;" onclick="closeConnectModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════ CHAT DRAWER ═══════ -->
 <div class="chat-drawer-overlay" id="chat-overlay" onclick="closeChat()"></div>
 <div class="chat-drawer" id="chat-drawer">
@@ -1736,6 +1785,7 @@ function renderAgents() {
           <div class="agent-ens">${esc(a.ens)}</div>
           <div class="agent-meta">
             <span class="type-badge">${esc(a.type)}</span>
+            ${a.origin ? `<span class="origin-badge origin-${esc(a.origin)}">${esc(a.origin)}</span>` : ''}
             <span class="status-dot ${esc(a.status)}"></span>
             <span class="status-label">${esc(a.status)}</span>
           </div>
@@ -2387,36 +2437,67 @@ function openChat(agentId) {
     if (sendBtn) sendBtn.disabled = false;
     renderChatHistory(agentId, a);
   } else {
-    // Not connected — show saved command + reconnect
+    // Not connected — show origin-appropriate offline state
     chatInput.disabled = true;
     chatInput.placeholder = 'Connect your agent to start chatting';
     if (sendBtn) sendBtn.disabled = true;
     const container = document.getElementById('chat-messages');
-    const savedConfig = loadAgentConfig(agentId);
-    const savedCmd = savedConfig?.runCmd || buildRunCmd(a.id, a.ens, savedConfig || {});
-    const savedUrl = savedConfig?.lastUrl || 'http://localhost:8420';
+    const origin = a.origin || 'deployed';
 
-    container.innerHTML = `
-      <div class="chat-welcome" style="text-align:left;">
-        <div style="text-align:center;margin-bottom:16px;">
+    if (origin === 'registered') {
+      // Registered only — prompt to connect
+      container.innerHTML = `
+        <div class="chat-welcome" style="text-align:center;">
+          <div style="font-size:40px;opacity:0.5;margin-bottom:8px;">&#x1F4CB;</div>
+          <h3>Agent Registered</h3>
+          <p style="color:var(--text-secondary);font-size:12px;margin-bottom:16px;">This agent has an on-chain identity but isn't connected to a running instance yet.</p>
+          <button class="btn-wizard btn-wizard-next" style="padding:10px 24px;font-size:12px;" onclick="closeChat();openConnectModal();">Connect a Running Agent</button>
+          <p style="color:var(--text-dim);font-size:11px;margin-top:12px;">Build a compatible agent using the <a href="docs.html#agent-api-spec" style="color:var(--cyan);">Agent API Spec</a></p>
+        </div>`;
+    } else if (origin === 'connected') {
+      // External agent — show reconnect to URL
+      const savedConfig = loadAgentConfig(agentId);
+      const savedUrl = savedConfig?.lastUrl || 'http://localhost:8420';
+      container.innerHTML = `
+        <div class="chat-welcome" style="text-align:center;">
           <div style="font-size:40px;opacity:0.5;margin-bottom:8px;">&#x1F50C;</div>
           <h3>Agent Offline</h3>
-          <p style="color:var(--text-secondary);font-size:12px;">Start your agent and reconnect to chat.</p>
-        </div>
-        <div style="color:var(--text-dim);font-size:11px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Run Command</div>
-        <div style="position:relative;">
-          <pre id="chat-run-cmd" style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:10px;color:var(--cyan);white-space:pre-wrap;word-break:break-all;line-height:1.7;max-height:160px;overflow-y:auto;">${esc(savedCmd)}</pre>
-          <button onclick="navigator.clipboard.writeText(document.getElementById('chat-run-cmd').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500);" style="position:absolute;top:6px;right:6px;padding:3px 10px;font-size:10px;background:rgba(0,229,255,0.15);border:1px solid var(--border-cyan);border-radius:4px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);">Copy</button>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:14px;">
-          <button class="btn-wizard btn-wizard-next" style="flex:1;padding:10px;font-size:12px;" onclick="attemptReconnect('${agentId}')">Reconnect (${esc(savedUrl)})</button>
-        </div>
-        <div id="reconnect-status" style="margin-top:8px;font-size:11px;text-align:center;"></div>
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="btn-wizard btn-wizard-back" style="flex:1;padding:8px;font-size:11px;" onclick="openUpdateConfig('${agentId}')">Update Config</button>
-          <button class="btn-wizard btn-wizard-back" style="flex:1;padding:8px;font-size:11px;" onclick="closeChat();if(typeof PocAPI!=='undefined')PocAPI.showConnectModal();">Connect Other URL</button>
-        </div>
-      </div>`;
+          <p style="color:var(--text-secondary);font-size:12px;margin-bottom:16px;">This external agent is not reachable. Make sure it's running.</p>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="btn-wizard btn-wizard-next" style="padding:10px 20px;font-size:12px;" onclick="attemptReconnect('${agentId}')">Reconnect (${esc(savedUrl)})</button>
+          </div>
+          <div id="reconnect-status" style="margin-top:8px;font-size:11px;"></div>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
+            <button class="btn-wizard btn-wizard-back" style="padding:8px 16px;font-size:11px;" onclick="closeChat();openConnectModal();">Connect Different URL</button>
+          </div>
+        </div>`;
+    } else {
+      // Deployed (IronClaw) — show cargo command + reconnect
+      const savedConfig = loadAgentConfig(agentId);
+      const savedCmd = savedConfig?.runCmd || buildRunCmd(a.id, a.ens, savedConfig || {});
+      const savedUrl = savedConfig?.lastUrl || 'http://localhost:8420';
+      container.innerHTML = `
+        <div class="chat-welcome" style="text-align:left;">
+          <div style="text-align:center;margin-bottom:16px;">
+            <div style="font-size:40px;opacity:0.5;margin-bottom:8px;">&#x1F50C;</div>
+            <h3>Agent Offline</h3>
+            <p style="color:var(--text-secondary);font-size:12px;">Start your agent and reconnect to chat.</p>
+          </div>
+          <div style="color:var(--text-dim);font-size:11px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Run Command</div>
+          <div style="position:relative;">
+            <pre id="chat-run-cmd" style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:10px;color:var(--cyan);white-space:pre-wrap;word-break:break-all;line-height:1.7;max-height:160px;overflow-y:auto;">${esc(savedCmd)}</pre>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('chat-run-cmd').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500);" style="position:absolute;top:6px;right:6px;padding:3px 10px;font-size:10px;background:rgba(0,229,255,0.15);border:1px solid var(--border-cyan);border-radius:4px;color:var(--cyan);cursor:pointer;font-family:var(--font-mono);">Copy</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button class="btn-wizard btn-wizard-next" style="flex:1;padding:10px;font-size:12px;" onclick="attemptReconnect('${agentId}')">Reconnect (${esc(savedUrl)})</button>
+          </div>
+          <div id="reconnect-status" style="margin-top:8px;font-size:11px;text-align:center;"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn-wizard btn-wizard-back" style="flex:1;padding:8px;font-size:11px;" onclick="openUpdateConfig('${agentId}')">Update Config</button>
+            <button class="btn-wizard btn-wizard-back" style="flex:1;padding:8px;font-size:11px;" onclick="closeChat();openConnectModal();">Connect Other URL</button>
+          </div>
+        </div>`;
+    }
   }
 
   // Open drawer
@@ -2966,6 +3047,143 @@ function ensProfileToAgent(profile) {
     ensResolved: true,
     stats: { actions: 0, proofs: 0, uptime: '-' }
   };
+}
+
+// ═══════════════════════════════════════
+// CONNECT EXTERNAL AGENT
+// ═══════════════════════════════════════
+
+let connectValidationResult = null;
+
+function openConnectModal() {
+  const modal = document.getElementById('connect-agent-modal');
+  modal.classList.add('active');
+  document.getElementById('connect-url-input').value = '';
+  document.getElementById('connect-validation').style.display = 'none';
+  document.getElementById('connect-preview').style.display = 'none';
+  document.getElementById('connect-error').style.display = 'none';
+  document.getElementById('connect-validate-btn').style.display = '';
+  document.getElementById('connect-confirm-btn').style.display = 'none';
+  connectValidationResult = null;
+  const urlInput = document.getElementById('connect-url-input');
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') urlInput.value = 'http://localhost:8420';
+  urlInput.focus();
+}
+
+function closeConnectModal() {
+  document.getElementById('connect-agent-modal').classList.remove('active');
+}
+
+async function doValidateAgent() {
+  const url = document.getElementById('connect-url-input').value.trim();
+  const errEl = document.getElementById('connect-error');
+  errEl.style.display = 'none';
+
+  if (!url) {
+    errEl.textContent = 'Please enter an agent URL.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  let baseUrl = url.replace(/\/+$/, '');
+  if (!baseUrl.startsWith('http')) baseUrl = 'http://' + baseUrl;
+
+  const btn = document.getElementById('connect-validate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Validating...';
+
+  const checklist = document.getElementById('connect-checklist');
+  const endpoints = [
+    { key: 'health', label: 'GET /health', required: true },
+    { key: 'status', label: 'GET /api/status', required: true },
+    { key: 'activity', label: 'GET /api/activity', required: false },
+    { key: 'proofs', label: 'GET /api/proofs', required: false },
+    { key: 'messages', label: 'GET /api/messages', required: false },
+  ];
+
+  // Show checklist with pending state
+  checklist.innerHTML = endpoints.map(ep =>
+    `<div id="chk-${ep.key}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+      <span class="chk-icon" style="width:18px;text-align:center;color:var(--text-dim);">&#x23F3;</span>
+      <span style="flex:1;color:var(--text-secondary);">${ep.label}</span>
+      <span style="font-size:10px;color:var(--text-dim);">${ep.required ? 'required' : 'optional'}</span>
+    </div>`
+  ).join('');
+  document.getElementById('connect-validation').style.display = 'block';
+
+  try {
+    const result = await PocAPI.validateSpec(baseUrl);
+    connectValidationResult = { ...result, baseUrl };
+
+    // Update checklist
+    endpoints.forEach(ep => {
+      const row = document.getElementById('chk-' + ep.key);
+      const icon = row.querySelector('.chk-icon');
+      const r = result[ep.key];
+      if (r && r.ok) {
+        icon.innerHTML = '&#x2705;';
+        row.style.borderColor = 'rgba(0,230,118,0.3)';
+      } else {
+        icon.innerHTML = ep.required ? '&#x274C;' : '&#x26A0;';
+        row.style.borderColor = ep.required ? 'rgba(255,61,90,0.3)' : 'rgba(255,183,77,0.3)';
+      }
+    });
+
+    // Show preview if status succeeded
+    if (result.agentPreview) {
+      const p = result.agentPreview;
+      document.getElementById('connect-preview-content').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+          <div><span style="color:var(--text-dim);">Agent ID:</span> <strong style="color:var(--text-primary);">${esc(p.agent_id || 'unknown')}</strong></div>
+          <div><span style="color:var(--text-dim);">ENS:</span> <strong style="color:var(--cyan);">${esc(p.ens_name || 'none')}</strong></div>
+          <div><span style="color:var(--text-dim);">Network:</span> ${esc(p.network || 'unknown')}</div>
+          <div><span style="color:var(--text-dim);">Status:</span> ${esc(p.status || 'unknown')}</div>
+          <div><span style="color:var(--text-dim);">Tools:</span> ${esc((p.allowed_tools || []).join(', ') || 'none')}</div>
+          <div><span style="color:var(--text-dim);">Actions:</span> ${p.stats?.total_actions || 0}</div>
+        </div>`;
+      document.getElementById('connect-preview').style.display = 'block';
+    }
+
+    if (result.valid) {
+      btn.style.display = 'none';
+      const confirmBtn = document.getElementById('connect-confirm-btn');
+      confirmBtn.style.display = '';
+      confirmBtn.disabled = false;
+    } else {
+      errEl.textContent = 'Required endpoints failed. Your agent must implement /health and /api/status.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Retry';
+    }
+  } catch (e) {
+    errEl.textContent = 'Validation failed: ' + e.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
+}
+
+async function doConfirmConnect() {
+  if (!connectValidationResult || !connectValidationResult.valid) return;
+  const btn = document.getElementById('connect-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Connecting...';
+
+  try {
+    const conn = await PocAPI.connect(connectValidationResult.baseUrl, 'connected');
+    btn.textContent = 'Connected!';
+    setTimeout(() => {
+      closeConnectModal();
+      window.location.reload();
+    }, 800);
+  } catch (e) {
+    const errEl = document.getElementById('connect-error');
+    errEl.textContent = 'Connection failed: ' + e.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
 }
 
 // ═══════════════════════════════════════

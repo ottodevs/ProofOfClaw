@@ -315,8 +315,12 @@ body.sidebar-collapsed .main-content { margin-left: 60px; }
   <div class="vault-container">
 
     <div class="vault-header" id="vault-header">
-      <h2 id="vault-title">Deploy New Agent</h2>
-      <p>Register an autonomous AI agent with cryptographic proof of behavior</p>
+      <div class="vault-mode-toggle" style="display:flex;gap:4px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:16px;width:fit-content;">
+        <button id="mode-register" class="vault-mode-btn active" onclick="setVaultMode('register')" style="padding:8px 20px;border-radius:6px;border:none;font-family:var(--font-mono);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;background:var(--cyan);color:#000;">Register Identity</button>
+        <button id="mode-deploy" class="vault-mode-btn" onclick="setVaultMode('deploy')" style="padding:8px 20px;border-radius:6px;border:none;font-family:var(--font-mono);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;background:transparent;color:var(--text-dim);">Deploy IronClaw</button>
+      </div>
+      <h2 id="vault-title">Register Agent Identity</h2>
+      <p id="vault-subtitle">Claim an on-chain identity for your agent. Works with any framework.</p>
     </div>
 
     <div class="vault-body" id="vault-body">
@@ -534,6 +538,17 @@ const SKILLS = [
 
 let wizardStep = 1;
 let wizardData = { type: null, skills: [], allowedTools: ['swap_tokens', 'transfer', 'query'] };
+let vaultMode = 'register'; // 'register' or 'deploy'
+
+// Register mode uses steps: 1 (type), 2 (identity), 3 (skills), 4 (policy), then register
+// Deploy mode uses all 6 steps (+ secrets + deploy)
+const REGISTER_STEPS = [1, 2, 3, 4];
+const DEPLOY_STEPS = [1, 2, 3, 4, 5, 6];
+
+function getSteps() { return vaultMode === 'register' ? REGISTER_STEPS : DEPLOY_STEPS; }
+function getTotalSteps() { return getSteps().length; }
+function getStepNumber() { return getSteps()[wizardStep - 1]; }
+function isLastStep() { return wizardStep >= getTotalSteps(); }
 
 // ═══════════════════════════════════════
 // INITIALIZATION
@@ -543,7 +558,37 @@ function init() {
   renderTypeGrid();
   renderSkillTags();
   bindNameField();
+  // Check URL param for mode
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('mode') === 'deploy') setVaultMode('deploy');
   updateWizardUI();
+}
+
+function setVaultMode(mode) {
+  vaultMode = mode;
+  wizardStep = 1;
+
+  // Update toggle buttons
+  document.getElementById('mode-register').style.background = mode === 'register' ? 'var(--cyan)' : 'transparent';
+  document.getElementById('mode-register').style.color = mode === 'register' ? '#000' : 'var(--text-dim)';
+  document.getElementById('mode-deploy').style.background = mode === 'deploy' ? 'var(--cyan)' : 'transparent';
+  document.getElementById('mode-deploy').style.color = mode === 'deploy' ? '#000' : 'var(--text-dim)';
+
+  // Update header
+  document.getElementById('vault-title').textContent = mode === 'register' ? 'Register Agent Identity' : 'Deploy IronClaw Agent';
+  document.getElementById('vault-subtitle').textContent = mode === 'register'
+    ? 'Claim an on-chain identity for your agent. Works with any framework.'
+    : 'Deploy a Rust/IronClaw agent with full runtime. Other frameworks? Use Register + Connect.';
+
+  // Update progress dots
+  const dotsContainer = document.getElementById('wizard-progress');
+  const steps = getSteps();
+  dotsContainer.innerHTML = steps.map((_, i) =>
+    `<div class="wizard-step-dot${i === 0 ? ' current' : ''}" data-step="${i + 1}"></div>`
+  ).join('');
+
+  // Reset form state
+  resetVault();
 }
 
 // ═══════════════════════════════════════
@@ -584,8 +629,9 @@ cargo run`;
 // ═══════════════════════════════════════
 
 function updateWizardUI() {
+  const currentStepNum = getStepNumber();
   for (let i = 1; i <= 6; i++) {
-    document.getElementById('step-' + i).classList.toggle('active', i === wizardStep);
+    document.getElementById('step-' + i).classList.toggle('active', i === currentStepNum);
   }
 
   document.querySelectorAll('.wizard-step-dot').forEach(dot => {
@@ -600,23 +646,32 @@ function updateWizardUI() {
 
   btnBack.style.visibility = wizardStep > 1 ? 'visible' : 'hidden';
 
-  if (wizardStep === 6) {
-    btnNext.textContent = 'Deploy Agent';
-    btnNext.className = 'btn-wizard btn-wizard-deploy';
+  if (isLastStep()) {
+    if (vaultMode === 'register') {
+      btnNext.textContent = 'Register Agent';
+      btnNext.className = 'btn-wizard btn-wizard-deploy';
+      btnNext.style.background = 'linear-gradient(135deg, #bb86fc, #9c27b0)';
+    } else {
+      btnNext.textContent = 'Deploy Agent';
+      btnNext.className = 'btn-wizard btn-wizard-deploy';
+      btnNext.style.background = '';
+    }
   } else {
     btnNext.textContent = 'Next';
     btnNext.className = 'btn-wizard btn-wizard-next';
+    btnNext.style.background = '';
   }
 
   validateStep();
-  if (wizardStep === 6) buildReview();
+  if (vaultMode === 'deploy' && currentStepNum === 6) buildReview();
 }
 
 function validateStep() {
   const btnNext = document.getElementById('btn-next');
   let valid = true;
+  const stepNum = getStepNumber();
 
-  switch(wizardStep) {
+  switch(stepNum) {
     case 1: valid = wizardData.type !== null; break;
     case 2: valid = document.getElementById('agent-name').value.trim().length > 0; break;
     case 5: valid = true; break;
@@ -629,8 +684,12 @@ function wizardNext() {
   if (document.getElementById('btn-next').disabled) return;
   gatherStepData();
 
-  if (wizardStep === 6) {
-    startDeploy();
+  if (isLastStep()) {
+    if (vaultMode === 'register') {
+      startRegister();
+    } else {
+      startDeploy();
+    }
     return;
   }
 
@@ -838,6 +897,7 @@ function deployComplete() {
     valueLimit: wizardData.valueLimit,
     endpoints: wizardData.endpoints,
     status: 'online',
+    origin: 'deployed',
     deployedAt: new Date().toISOString(),
     description: wizardData.description || '',
     inftTokenId: Math.floor(Math.random() * 9000) + 1000,
@@ -891,6 +951,88 @@ function deployComplete() {
   `;
 }
 
+// ─── Register (identity only, no deploy) ───
+
+function startRegister() {
+  gatherStepData();
+
+  const footer = document.getElementById('vault-footer');
+  const wizardProgress = document.getElementById('wizard-progress');
+  footer.style.display = 'none';
+  wizardProgress.style.display = 'none';
+
+  // Hide current step, show register success
+  for (let i = 1; i <= 6; i++) {
+    document.getElementById('step-' + i).classList.remove('active');
+  }
+
+  const agentId = wizardData.name.toLowerCase().replace(/[^a-z0-9-]/g, '') || 'agent-' + Date.now();
+  const demoPolicyHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+
+  const newAgent = {
+    id: agentId,
+    name: wizardData.name,
+    ens: wizardData.ens,
+    type: wizardData.type,
+    typeIcon: wizardData.typeIcon,
+    network: wizardData.network,
+    skills: wizardData.skills,
+    allowedTools: wizardData.allowedTools,
+    valueLimit: wizardData.valueLimit,
+    endpoints: wizardData.endpoints,
+    status: 'registered',
+    origin: 'registered',
+    deployedAt: new Date().toISOString(),
+    description: wizardData.description || '',
+    policyHash: demoPolicyHash,
+    stats: { actions: 0, proofs: 0, uptime: '-' }
+  };
+
+  let agents = [];
+  try { agents = JSON.parse(localStorage.getItem('poc_agents')) || []; } catch(e) { agents = []; }
+  agents.push(newAgent);
+  localStorage.setItem('poc_agents', JSON.stringify(agents));
+
+  document.getElementById('vault-title').textContent = 'Agent Registered!';
+
+  // Show success in the deploy-success container (reuse the UI)
+  const successEl = document.getElementById('deploy-success');
+  successEl.classList.add('active');
+  successEl.querySelector('.success-icon').innerHTML = '&#x2705;';
+  successEl.querySelector('h3').textContent = 'Identity Registered';
+  document.getElementById('success-message').textContent =
+    `${newAgent.name} (${newAgent.ens}) is registered on-chain with policy hash committed.`;
+
+  document.getElementById('success-links').innerHTML = `
+    <div style="text-align:left;width:100%;margin-bottom:16px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Registration Summary</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+          <div><span style="color:var(--text-dim);">Agent ID:</span> <strong style="color:var(--text-primary);">${esc(agentId)}</strong></div>
+          <div><span style="color:var(--text-dim);">ENS:</span> <strong style="color:var(--cyan);">${esc(newAgent.ens)}</strong></div>
+          <div><span style="color:var(--text-dim);">Type:</span> ${esc(wizardData.typeName || wizardData.type)}</div>
+          <div><span style="color:var(--text-dim);">Network:</span> ${esc(newAgent.network)}</div>
+          <div style="grid-column:1/-1;"><span style="color:var(--text-dim);">Policy Hash:</span> <span style="font-family:var(--font-mono);font-size:10px;color:var(--cyan);">${esc(demoPolicyHash.slice(0,18))}...</span></div>
+        </div>
+      </div>
+
+      <div style="background:rgba(187,134,252,0.08);border:1px solid rgba(187,134,252,0.3);border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;color:#bb86fc;margin-bottom:8px;">Next Steps</div>
+        <ol style="font-size:12px;color:var(--text-secondary);line-height:1.8;padding-left:20px;margin:0;">
+          <li>Build your agent using any framework (Python, Node, Go, Rust...)</li>
+          <li>Implement the <a href="docs.html#agent-api-spec" style="color:var(--cyan);">Agent API Spec</a> endpoints</li>
+          <li>Go to <a href="agents.html" style="color:var(--cyan);">Agents</a> and click <strong>Connect Agent</strong> to link your running agent</li>
+        </ol>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;width:100%;flex-wrap:wrap;">
+      <a href="agents.html" class="btn-primary" style="flex:1;text-align:center;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">View Agents</a>
+      <a href="docs.html#agent-api-spec" style="flex:1;text-align:center;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;background:rgba(187,134,252,0.15);border:1px solid rgba(187,134,252,0.3);color:#bb86fc;">View API Spec</a>
+      <button class="btn-wizard btn-wizard-next" style="flex:1;" onclick="resetVault()">Register Another</button>
+    </div>
+  `;
+}
+
 function resetVault() {
   wizardStep = 1;
   wizardData = { type: null, skills: [], allowedTools: ['swap_tokens', 'transfer', 'query'] };
@@ -918,7 +1060,14 @@ function resetVault() {
   document.getElementById('review-content').style.display = 'block';
   document.getElementById('wizard-progress').style.display = 'flex';
   document.getElementById('vault-footer').style.display = 'flex';
-  document.getElementById('vault-title').textContent = 'Deploy New Agent';
+  document.getElementById('vault-title').textContent = vaultMode === 'register' ? 'Register Agent Identity' : 'Deploy IronClaw Agent';
+
+  // Regenerate progress dots for current mode
+  const dotsContainer = document.getElementById('wizard-progress');
+  const steps = getSteps();
+  dotsContainer.innerHTML = steps.map((_, i) =>
+    `<div class="wizard-step-dot${i === 0 ? ' current' : ''}" data-step="${i + 1}"></div>`
+  ).join('');
 
   document.querySelectorAll('.deploy-step-item').forEach(s => {
     s.classList.remove('active', 'done');

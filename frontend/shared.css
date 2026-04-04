@@ -509,6 +509,31 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   border: 1px solid rgba(179, 136, 255, 0.2);
 }
 
+/* ── Origin Badges ── */
+.origin-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.origin-deployed {
+  background: rgba(0, 229, 255, 0.1);
+  color: var(--cyan);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+}
+.origin-connected {
+  background: rgba(0, 230, 118, 0.1);
+  color: var(--green);
+  border: 1px solid rgba(0, 230, 118, 0.25);
+}
+.origin-registered {
+  background: rgba(187, 134, 252, 0.1);
+  color: #bb86fc;
+  border: 1px solid rgba(187, 134, 252, 0.25);
+}
+
 /* ── Cards ── */
 .card {
   background: var(--bg-card);
