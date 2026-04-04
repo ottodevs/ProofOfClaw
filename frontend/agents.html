@@ -3039,7 +3039,7 @@ function renderChatHistory(agentId, agentData) {
     if (conn) {
       container.innerHTML = `
         <div class="chat-welcome">
-          <div class="welcome-icon">${agentSvg(agentData.type)}</div>
+          <div class="welcome-icon"><img src="${agentData.typeIcon}" alt="" style="width:100%;height:100%;object-fit:contain;"></div>
           <h3>Chat with ${esc(agentData.name)}</h3>
           <p><span style="color:var(--green);">&#x25CF;</span> Connected to live agent. Send a message to interact.<br>All actions generate cryptographic proofs via RISC Zero.</p>
           <div class="welcome-hint">
@@ -3156,7 +3156,7 @@ async function sendLiveChat(agentData, userMessage, baseUrl) {
   const typingId = 'typing-' + Date.now();
   container.insertAdjacentHTML('beforeend', `
     <div class="chat-typing" id="${typingId}">
-      <div class="chat-typing-avatar">${agentSvg(agentData.type)}</div>
+      <div class="chat-typing-avatar"><img src="${agentData.typeIcon}" alt="" style="width:100%;height:100%;object-fit:contain;"></div>
       <div class="chat-typing-dots"><span></span><span></span><span></span></div>
     </div>`);
   scrollChatToBottom();
@@ -3353,6 +3353,19 @@ async function resolveAndAddAgent(ensName) {
 }
 
 function ensProfileToAgent(profile) {
+  const typeIcons = {
+    'defi-strategist': 'public/icons/defi-strategist.svg',
+    'security-auditor': 'public/icons/security-auditor.svg',
+    'coordinator': 'public/icons/coordinator.svg',
+    'data-analyst': 'public/icons/data-analyst.svg',
+    'governance-agent': 'public/icons/governance-agent.svg',
+    'devops-engineer': 'public/icons/devops-engineer.svg',
+    'full-stack-dev': 'public/icons/full-stack-dev.svg',
+    'blockchain-research': 'public/icons/blockchain-research.svg',
+    'frontend-specialist': 'public/icons/frontend-specialist.svg',
+    'ml-engineer': 'public/icons/ml-engineer.svg',
+    'unknown': 'public/icons/coordinator.svg',
+  };
   const agentId = profile.ensName.split('.')[0];
   return {
     id: agentId,
