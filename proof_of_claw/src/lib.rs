@@ -31,7 +31,6 @@ pub mod eip8004;
 pub mod ens_dm3;
 pub mod injection_detector;
 pub mod inft;
-pub mod ironclaw_adapter;
 pub mod job_scheduler;
 pub mod ledger;
 pub mod policy_engine;
@@ -40,12 +39,12 @@ pub mod registry;
 pub mod types;
 pub mod zero_g;
 
+#[cfg(feature = "ironclaw")]
+pub mod ironclaw_adapter;
+
 // Re-exports for convenience
 pub use config::{AgentConfig, PolicyConfig};
 pub use injection_detector::InjectionDetector;
-pub use ironclaw_adapter::{
-    InjectionDetectionHook, IronClawAdapter, PolicyEnforcementHook, ProofGenerationHook,
-};
 pub use policy_engine::PolicyEngine;
 pub use proof_generator::ProofGenerator;
 pub use registry::{compute_capability_hash, Tool, ToolRegistry};
@@ -54,4 +53,10 @@ pub use types::{
     AgentMessage, AgentPolicy, ExecutionTrace, InferenceRequest, InferenceResponse,
     MessagePayload, MessageType, PolicyResult, PolicySeverity, ProofReceipt, ToolInvocation,
     VerifiedOutput,
+};
+
+// Ironclaw integration - only available with ironclaw feature
+#[cfg(feature = "ironclaw")]
+pub use ironclaw_adapter::{
+    InjectionDetectionHook, IronClawAdapter, PolicyEnforcementHook, ProofGenerationHook,
 };

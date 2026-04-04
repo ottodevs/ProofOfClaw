@@ -5,6 +5,8 @@
 //! - `BeforeToolCall` — policy engine checks (FailClosed)
 //! - `OnSessionEnd` — store trace on 0G + generate ZK proof
 
+#![cfg(feature = "ironclaw")]
+
 use crate::{
     config::AgentConfig,
     injection_detector::InjectionDetector,
