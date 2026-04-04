@@ -33,12 +33,16 @@ const CONTRACT_ABIS = {
 // Contract addresses by network
 const CONTRACT_ADDRESSES = {
   sepolia: {
-    inft: '0x0000000000000000000000000000000000000000', // TODO: Deploy and update
-    registry: '0x0000000000000000000000000000000000000000', // TODO: Deploy and update
+    inft: '0xf20aE18D72A7C811873D5ce24D9D24214123f48F', // ProofOfClawINFT
+    registry: '0x6254651F29e7afEE1c52a1D6Fd4b7B211d2dBed2', // EIP8004Integration
+    swarm: '0x11938021169a5094B5c67389286A1FAe72bdE561', // SoulVaultSwarm
+    registryAdapter: '0x56B19562c7d6cB3bCCD0FA78214EFC3928F6eE6a', // ERC8004RegistryAdapter
   },
   og_testnet: {
-    inft: '0x0000000000000000000000000000000000000000',
-    registry: '0x0000000000000000000000000000000000000000',
+    inft: '0x45c69b7be9dc9a4126053a17a43e664b4ae031a1', // ProofOfClawINFT
+    registry: '0xe34dab193105f3d7ec6ee4e6172cbe6213108d8b', // ProofOfClawVerifier
+    swarm: '0xa70EB0DF1563708F28285C2DeA2BF31aadFB544D', // SoulVaultSwarm
+    registryAdapter: '0x9De4F1b14660B5f8145a78Cfc0312B1BFb812C46', // ERC8004RegistryAdapter
   },
 };
 

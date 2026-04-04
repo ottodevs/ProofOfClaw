@@ -56,7 +56,7 @@ fn main() -> Result<()> {
 
     // Example execution trace from an agent
     let trace = ExecutionTrace {
-        agent_id: "alice.proofclaw.eth".to_string(),
+        agent_id: "alice.proofofclaw.eth".to_string(),
         inference_commitment: [0u8; 32],
         tool_invocations: vec![
             ToolInvocation {

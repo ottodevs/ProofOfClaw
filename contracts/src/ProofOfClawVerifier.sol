@@ -14,8 +14,11 @@ interface IEIP8004Integration {
 }
 
 contract ProofOfClawVerifier {
-    IRiscZeroVerifier public immutable verifier;
-    bytes32 public immutable imageId;
+    IRiscZeroVerifier public verifier;
+    bytes32 public imageId;
+
+    /// @notice Contract deployer — only address that can configure integrations
+    address public immutable owner;
 
     /// @notice EIP-8004 integration contract for recording validation results
     IEIP8004Integration public eip8004;
@@ -59,15 +62,40 @@ contract ProofOfClawVerifier {
     error Unauthorized();
     error ActionNotPending();
     error AgentNotActive();
+    error AgentAlreadyExists();
+
+    event VerifierUpdated(address oldVerifier, address newVerifier);
+    event ImageIdUpdated(bytes32 oldImageId, bytes32 newImageId);
 
     constructor(IRiscZeroVerifier _verifier, bytes32 _imageId) {
         verifier = _verifier;
         imageId = _imageId;
+        owner = msg.sender;
     }
 
     /// @notice Set the EIP-8004 integration contract address
-    /// @dev Called once after deployment. Only callable when not yet set.
+    /// @dev Called once after deployment. Only callable by owner when not yet set.
+    /// @notice Update the RISC Zero verifier contract address
+    /// @param newVerifier Address of the new IRiscZeroVerifier implementation
+    function updateVerifier(address newVerifier) external {
+        if (msg.sender != owner) revert Unauthorized();
+        require(newVerifier != address(0), "Zero address");
+        address oldVerifier = address(verifier);
+        verifier = IRiscZeroVerifier(newVerifier);
+        emit VerifierUpdated(oldVerifier, newVerifier);
+    }
+
+    /// @notice Update the RISC Zero guest image ID
+    /// @param newImageId New guest program image ID
+    function updateImageId(bytes32 newImageId) external {
+        if (msg.sender != owner) revert Unauthorized();
+        bytes32 oldImageId = imageId;
+        imageId = newImageId;
+        emit ImageIdUpdated(oldImageId, newImageId);
+    }
+
     function setEIP8004Integration(address _eip8004) external {
+        if (msg.sender != owner) revert Unauthorized();
         require(address(eip8004) == address(0), "Already set");
         eip8004 = IEIP8004Integration(_eip8004);
     }
@@ -78,6 +106,11 @@ contract ProofOfClawVerifier {
         uint256 maxValueAutonomous,
         address agentWallet
     ) external {
+        AgentPolicy storage existing = agents[agentId];
+        if (existing.active) revert AgentAlreadyExists();
+        // Allow re-registration only by the original owner (for reactivation)
+        if (existing.owner != address(0) && existing.owner != msg.sender) revert Unauthorized();
+
         agents[agentId] = AgentPolicy({
             policyHash: policyHash,
             maxValueAutonomous: maxValueAutonomous,
