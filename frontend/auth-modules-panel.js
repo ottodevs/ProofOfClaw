@@ -297,19 +297,12 @@ const PocAuthModules = (function() {
   }
 
   async function testOneClawConnection() {
-    try {
-      const response = await fetch(`${config.oneclawEndpoint.replace('/v1', '')}/health`, {
-        method: 'GET',
-        headers: { 'X-API-Key': config.oneclawApiKey || 'test-key' }
-      });
-      if (response.ok) {
-        config.storageEnabled = true;
-        console.log('✅ 1claw API connected');
-        return true;
-      }
-    } catch (e) {
-      console.log('❌ 1claw API not available, using localStorage fallback');
+    // Skip health check for real 1claw API - just try to authenticate
+    if (config.oneclawApiKey && config.agentId) {
+      const authed = await authenticateWithOneClaw();
+      return authed;
     }
+    console.log('1claw: No API key configured');
     return false;
   }
 
@@ -472,6 +465,11 @@ const PocAuthModules = (function() {
   }
 
   async function initGoogleAuth() {
+    if (!config.googleClientId) {
+      showToast('Google Client ID not configured', 'error');
+      console.error('Missing GOOGLE_CLIENT_ID. Get one at https://console.cloud.google.com/apis/credentials');
+      return null;
+    }
     const oauth2 = await loadGoogleGIS();
     googleClient = oauth2.initTokenClient({
       client_id: config.googleClientId,
@@ -511,7 +509,9 @@ const PocAuthModules = (function() {
       setStoredConnections(connections);
       render();
     } else {
-      initGoogleAuth().then(c => c.requestAccessToken({ prompt: 'consent' }));
+      initGoogleAuth().then(c => {
+        if (c) c.requestAccessToken({ prompt: 'consent' });
+      });
     }
   }
 
