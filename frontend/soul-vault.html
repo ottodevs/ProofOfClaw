@@ -152,7 +152,19 @@ body.sidebar-collapsed .main-content { margin-left: 60px; }
 
 .type-option:hover { border-color: var(--border-cyan); background: var(--bg-card-hover); }
 .type-option.selected { border-color: var(--cyan); background: rgba(0,229,255,0.06); box-shadow: 0 0 16px rgba(0,229,255,0.1); }
-.type-option .type-emoji { font-size: 24px; width: 36px; text-align: center; flex-shrink: 0; }
+.type-option .type-emoji,
+.type-option .type-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.type-option .type-icon {
+  filter: drop-shadow(0 0 4px rgba(0,229,255,0.3));
+}
 .type-option .type-label { font-weight: 600; font-size: 13px; color: var(--text-primary); }
 .type-option .type-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 
@@ -610,16 +622,16 @@ import { agentRegistration, ZERO_G_CONFIG } from './0g-registration.js';
 // ═══════════════════════════════════════
 
 const AGENT_TYPES = [
-  { id: 'full-stack-dev', icon: '&#x1F4BB;', emoji: '\uD83D\uDCBB', name: 'Full-Stack Dev', desc: 'Build end-to-end dApps and smart contracts' },
-  { id: 'blockchain-research', icon: '&#x1F52C;', emoji: '\uD83D\uDD2C', name: 'Blockchain Research', desc: 'Analyze protocols, MEV, and on-chain data' },
-  { id: 'security-auditor', icon: '&#x1F512;', emoji: '\uD83D\uDD12', name: 'Security Auditor', desc: 'Audit smart contracts for vulnerabilities' },
-  { id: 'defi-strategist', icon: '&#x1F4C8;', emoji: '\uD83D\uDCC8', name: 'DeFi Strategist', desc: 'Optimize yield farming and liquidity' },
-  { id: 'data-analyst', icon: '&#x1F4CA;', emoji: '\uD83D\uDCCA', name: 'Data Analyst', desc: 'Analyze blockchain data and metrics' },
-  { id: 'devops-engineer', icon: '&#x2699;', emoji: '\u2699\uFE0F', name: 'DevOps Engineer', desc: 'Manage infrastructure and deployments' },
-  { id: 'coordinator', icon: '&#x1F30F;', emoji: '\uD83C\uDF0F', name: 'Coordinator', desc: 'Orchestrate multi-agent workflows' },
-  { id: 'frontend-specialist', icon: '&#x1F3A8;', emoji: '\uD83C\uDFA8', name: 'Frontend Specialist', desc: 'Build responsive web3 interfaces' },
-  { id: 'ml-engineer', icon: '&#x1F9E0;', emoji: '\uD83E\uDDE0', name: 'ML Engineer', desc: 'Train models on on-chain data patterns' },
-  { id: 'governance-agent', icon: '&#x1F3DB;', emoji: '\uD83C\uDFDB\uFE0F', name: 'Governance Agent', desc: 'Participate in DAO governance and voting' },
+  { id: 'full-stack-dev', icon: 'icons/full-stack-dev.svg', name: 'Full-Stack Dev', desc: 'Build end-to-end dApps and smart contracts' },
+  { id: 'blockchain-research', icon: 'icons/blockchain-research.svg', name: 'Blockchain Research', desc: 'Analyze protocols, MEV, and on-chain data' },
+  { id: 'security-auditor', icon: 'icons/security-auditor.svg', name: 'Security Auditor', desc: 'Audit smart contracts for vulnerabilities' },
+  { id: 'defi-strategist', icon: 'icons/defi-strategist.svg', name: 'DeFi Strategist', desc: 'Optimize yield farming and liquidity' },
+  { id: 'data-analyst', icon: 'icons/data-analyst.svg', name: 'Data Analyst', desc: 'Analyze blockchain data and metrics' },
+  { id: 'devops-engineer', icon: 'icons/devops-engineer.svg', name: 'DevOps Engineer', desc: 'Manage infrastructure and deployments' },
+  { id: 'coordinator', icon: 'icons/coordinator.svg', name: 'Coordinator', desc: 'Orchestrate multi-agent workflows' },
+  { id: 'frontend-specialist', icon: 'icons/frontend-specialist.svg', name: 'Frontend Specialist', desc: 'Build responsive web3 interfaces' },
+  { id: 'ml-engineer', icon: 'icons/ml-engineer.svg', name: 'ML Engineer', desc: 'Train models on on-chain data patterns' },
+  { id: 'governance-agent', icon: 'icons/governance-agent.svg', name: 'Governance Agent', desc: 'Participate in DAO governance and voting' },
 ];
 
 const SKILLS = [
@@ -990,7 +1002,7 @@ function renderTypeGrid() {
   const grid = document.getElementById('type-grid');
   grid.innerHTML = AGENT_TYPES.map(t => `
     <div class="type-option" data-type="${t.id}" onclick="selectType('${t.id}', this)">
-      <span class="type-emoji">${t.icon}</span>
+      <img src="${t.icon}" class="type-icon" alt="${t.name}">
       <div>
         <div class="type-label">${t.name}</div>
         <div class="type-desc">${t.desc}</div>
@@ -1004,7 +1016,7 @@ function selectType(typeId, el) {
   el.classList.add('selected');
   wizardData.type = typeId;
   const typeObj = AGENT_TYPES.find(t => t.id === typeId);
-  wizardData.typeIcon = typeObj ? typeObj.emoji : '';
+  wizardData.typeIcon = typeObj ? typeObj.icon : '';
   wizardData.typeName = typeObj ? typeObj.name : '';
   validateStep();
 }
