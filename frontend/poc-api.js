@@ -143,7 +143,6 @@ const PocAPI = (() => {
       name: status.agent_id,
       ens: status.ens_name,
       type: 'openclaw-agent',
-      typeIcon: '\u27C1',
       network: status.network,
       skills: status.allowed_tools || [],
       allowedTools: status.allowed_tools || [],

@@ -739,6 +739,94 @@ function startHealthServer() {
       return;
     }
 
+    // --- POST /create-org — create org + configure bridge locally ---
+    // Called by frontend org registration. No external dependency.
+    // Body: { name, slug, description?, network? }
+    // Returns: { ok, orgId, channelId, agentMapping }
+    if (req.method === "POST" && req.url === "/create-org") {
+      let body = "";
+      req.on("data", (chunk) => { body += chunk; });
+      req.on("end", async () => {
+        try {
+          const { name, slug, description, network, agents } = JSON.parse(body);
+          if (!name || !slug) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: "name and slug are required" }));
+            return;
+          }
+
+          const orgId = `org-${slug}-${Date.now()}`;
+          const defaultChannelId = `ch-${slug}-general-${Date.now()}`;
+
+          // Build agent mapping from provided agents or use defaults
+          const agentMapping = {};
+          if (agents && Array.isArray(agents)) {
+            for (const a of agents) {
+              if (a.ensName) {
+                agentMapping[a.ensName] = {
+                  agentId: a.agentId || `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  channelId: a.channelId || defaultChannelId,
+                };
+              }
+            }
+          }
+
+          // Register all mapped agents in the identity map
+          for (const [ensName, mapping] of Object.entries(agentMapping)) {
+            registerMapping(ensName, mapping.agentId, mapping.channelId);
+          }
+
+          // Save org config
+          const orgConfig = {
+            orgId,
+            name,
+            slug,
+            description: description || "",
+            network: network || "sepolia",
+            defaultChannelId,
+            channels: [
+              { id: defaultChannelId, name: "general", createdAt: Date.now() },
+            ],
+            agents: agentMapping,
+            createdAt: Date.now(),
+          };
+
+          const orgConfigPath = join(__dirname, "org-config.json");
+          writeFileSync(orgConfigPath, JSON.stringify(orgConfig, null, 2) + "\n");
+
+          // Update bridge config with the new org
+          let config = loadConfig() || {};
+          config.orgId = orgId;
+          config.orgName = name;
+          config.defaultChannelId = defaultChannelId;
+          saveConfig(config);
+          bridgeConfig = config;
+
+          log("ORG", `Created org "${name}" (${orgId}) with channel ${defaultChannelId}`);
+
+          // Start connections if keypair exists and not already connected
+          if (!swarmConnected && bridgeKeypair) {
+            const { privateKey } = bridgeKeypair;
+            connectToDm3();
+            log("BRIDGE", "DM3 connection started after org creation");
+          }
+
+          res.writeHead(201);
+          res.end(JSON.stringify({
+            ok: true,
+            orgId,
+            defaultChannelId,
+            agents: agentMapping,
+            ens: `${slug}.proofofclaw.eth`,
+          }));
+        } catch (e) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      });
+      return;
+    }
+
     // --- POST /setup — onboarding: register bridge with Swarm hub ---
     // Called by frontend during org creation to connect POC to Swarm.
     // Body: { orgId: string, agentName?: string, hubUrl?: string }
@@ -867,16 +955,13 @@ async function main() {
     log("INIT", "Bridge is waiting for configuration.");
     log("INIT", "");
     log("INIT", "Option 1: Use the ProofOfClaw frontend (recommended)");
-    log("INIT", "  - Open the dashboard and complete the Swarm connection step");
+    log("INIT", "  - Open the dashboard and register your organization");
+    log("INIT", "  - The bridge will be configured automatically");
     log("INIT", "");
     log("INIT", "Option 2: Use curl");
-    log("INIT", `  curl -X POST http://localhost:${BRIDGE_PORT}/setup \\`);
+    log("INIT", `  curl -X POST http://localhost:${BRIDGE_PORT}/create-org \\`);
     log("INIT", `    -H 'Content-Type: application/json' \\`);
-    log("INIT", `    -d '{"orgId": "YOUR_ORG_ID"}'`);
-    log("INIT", "");
-    log("INIT", "To get an org ID:");
-    log("INIT", "  1. Go to swarmprotocol.fun and create/join an organization");
-    log("INIT", "  2. Copy the org ID from the URL or settings page");
+    log("INIT", `    -d '{"name": "My Org", "slug": "my-org"}'`);
     log("INIT", "");
   }
 

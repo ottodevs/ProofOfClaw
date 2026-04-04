@@ -156,6 +156,49 @@ function toSlug(str) {
   return str.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
 }
 
+/* ── ENS Availability Checker ── */
+let _ensCheckTimers = {};
+
+function createENSChecker(ensInputId) {
+  const wrap = document.createElement('div');
+  wrap.className = 'ens-check-status';
+  wrap.id = ensInputId + '-status';
+  wrap.style.cssText = 'font-size:11px;margin-top:4px;min-height:16px;transition:opacity 0.2s;';
+  return wrap;
+}
+
+function checkENSAvailability(ensName, statusElId) {
+  const el = document.getElementById(statusElId);
+  if (!el) return;
+
+  if (!ensName || ensName.length < 5) {
+    el.textContent = '';
+    return;
+  }
+
+  // Debounce
+  clearTimeout(_ensCheckTimers[statusElId]);
+  el.innerHTML = '<span style="color:var(--text-dim);">Checking availability...</span>';
+
+  _ensCheckTimers[statusElId] = setTimeout(async () => {
+    if (typeof ENSResolver === 'undefined') {
+      el.innerHTML = '<span style="color:var(--text-dim);">ENS resolver not loaded</span>';
+      return;
+    }
+
+    try {
+      const addr = await ENSResolver.resolveAddress(ensName);
+      if (addr) {
+        el.innerHTML = `<span style="color:var(--red);">&#x2717; <strong>${esc(ensName)}</strong> is already taken</span>`;
+      } else {
+        el.innerHTML = `<span style="color:var(--green);">&#x2713; <strong>${esc(ensName)}</strong> is available</span>`;
+      }
+    } catch (e) {
+      el.innerHTML = `<span style="color:var(--text-dim);">Could not check — ${esc(e.message)}</span>`;
+    }
+  }, 500);
+}
+
 /* ── Org Badge Injection ── */
 function injectOrgBadge() {
   const org = getOrg();
@@ -210,6 +253,7 @@ function showOrgRegistration() {
           <input type="text" id="org-ens-input" placeholder="auto-generated" readonly
                  style="color:var(--cyan);background:var(--bg-primary);">
           <div class="form-hint">Your organization's top-level ENS domain</div>
+          <div id="org-ens-input-status" class="ens-check-status" style="font-size:11px;margin-top:4px;min-height:16px;"></div>
         </div>
         <div class="form-group">
           <label>Description</label>
@@ -259,25 +303,53 @@ function showOrgRegistration() {
     overlay.querySelectorAll('.org-slug-preview').forEach(el => {
       el.textContent = slug || 'org';
     });
+
+    // Check ENS availability
+    checkENSAvailability(ens, 'org-ens-input-status');
   });
 
   // Focus trap
   trapFocus(overlay.querySelector('.modal'));
 }
 
-function submitOrgRegistration() {
+async function submitOrgRegistration() {
   const name = document.getElementById('org-name-input').value.trim();
   const slug = toSlug(name);
   if (!slug) return;
 
+  const btn = document.getElementById('org-register-btn');
+  btn.disabled = true;
+  btn.textContent = 'Registering...';
+
+  const description = document.getElementById('org-desc-input').value.trim();
+  const network = document.getElementById('org-network-input').value;
+
+  // Register org on the swarm bridge (local service)
+  const BRIDGE_URL = window.POC_BRIDGE_URL || 'http://localhost:3002';
+  let bridgeResult = null;
+  try {
+    const resp = await fetch(`${BRIDGE_URL}/create-org`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, slug, description, network }),
+    });
+    if (resp.ok) {
+      bridgeResult = await resp.json();
+    }
+  } catch (_) {
+    // Bridge not running — org still works locally
+  }
+
   const org = {
-    id: 'org-' + Date.now(),
+    id: bridgeResult?.orgId || ('org-' + Date.now()),
     name: name,
     slug: slug,
     ens: slug + '.proofofclaw.eth',
-    description: document.getElementById('org-desc-input').value.trim(),
-    network: document.getElementById('org-network-input').value,
+    description: description,
+    network: network,
     icon: '\u2B23',
+    defaultChannelId: bridgeResult?.defaultChannelId || null,
+    bridgeConfigured: !!bridgeResult,
     createdAt: new Date().toISOString()
   };
 
@@ -287,12 +359,17 @@ function submitOrgRegistration() {
   // Show success
   const overlay = document.getElementById('org-register-overlay');
   const modal = overlay.querySelector('.modal');
+  const bridgeNote = bridgeResult
+    ? '<p style="color:var(--green);font-size:12px;margin-top:8px;">Swarm bridge configured automatically.</p>'
+    : '<p style="color:var(--text-dim);font-size:12px;margin-top:8px;">Swarm bridge not running \u2014 org saved locally. Start the bridge to enable cross-swarm messaging.</p>';
+
   modal.innerHTML = `
     <div class="modal-body" style="padding:32px;">
       <div style="text-align:center;margin-bottom:24px;">
         <div style="font-size:40px;margin-bottom:12px;">\u2705</div>
         <h2 style="font-family:var(--font-display);font-weight:700;margin-bottom:4px;">Organization Registered!</h2>
         <p style="color:var(--cyan);font-family:var(--font-mono);font-size:14px;">${esc(org.ens)}</p>
+        ${bridgeNote}
       </div>
       <button class="btn btn-primary" style="width:100%;padding:12px 32px;font-size:14px;font-weight:700;" onclick="closeOrgRegistration()">Continue</button>
     </div>
@@ -342,6 +419,7 @@ function showSwarmCreation() {
           <input type="text" id="swarm-ens-input" placeholder="auto-generated" readonly
                  style="color:var(--purple);background:var(--bg-primary);">
           <div class="form-hint">Swarm ENS: swarm-name.${esc(org.slug)}.eth</div>
+          <div id="swarm-ens-input-status" class="ens-check-status" style="font-size:11px;margin-top:4px;min-height:16px;"></div>
         </div>
         <div class="form-group">
           <label>Description</label>
@@ -390,12 +468,15 @@ function showSwarmCreation() {
     ensInput.value = ens;
     btn.disabled = !slug;
     overlay.querySelector('#swarm-slug-preview').textContent = slug || 'swarm';
+
+    // Check ENS availability
+    checkENSAvailability(ens, 'swarm-ens-input-status');
   });
 
   trapFocus(overlay.querySelector('.modal'));
 }
 
-function submitSwarmCreation() {
+async function submitSwarmCreation() {
   const org = getOrg();
   const name = document.getElementById('swarm-name-input').value.trim();
   const slug = toSlug(name);
@@ -409,6 +490,27 @@ function submitSwarmCreation() {
     return;
   }
 
+  // Register channel on bridge if available
+  const BRIDGE_URL = window.POC_BRIDGE_URL || 'http://localhost:3002';
+  let channelId = null;
+  try {
+    const resp = await fetch(`${BRIDGE_URL}/create-org`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: `${org.name} / ${name}`,
+        slug: `${org.slug}-${slug}`,
+        description: document.getElementById('swarm-desc-input').value.trim(),
+      }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      channelId = data.defaultChannelId;
+    }
+  } catch (_) {
+    // Bridge offline — continue with local-only swarm
+  }
+
   const swarm = {
     id: 'swarm-' + Date.now(),
     name: name,
@@ -416,6 +518,7 @@ function submitSwarmCreation() {
     ens: `${slug}.${org.slug}.eth`,
     description: document.getElementById('swarm-desc-input').value.trim(),
     orgId: org.id,
+    channelId: channelId,
     agentCount: 0,
     createdAt: new Date().toISOString()
   };

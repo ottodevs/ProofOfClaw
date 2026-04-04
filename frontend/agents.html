@@ -1628,6 +1628,11 @@
           <textarea id="agent-desc" placeholder="What does this agent do?"></textarea>
         </div>
         <div class="form-group">
+          <label>Skills</label>
+          <input type="text" id="agent-skills" placeholder="e.g. solidity, defi-protocols, zk-proofs">
+          <div class="form-hint">Comma-separated list of capabilities. Shown on your agent's profile.</div>
+        </div>
+        <div class="form-group">
           <label>Network</label>
           <select id="agent-network">
             <option value="sepolia">Sepolia (Testnet)</option>
@@ -1672,8 +1677,9 @@
         <div class="wizard-step-subtitle">Provide credentials for your agent (encrypted at rest)</div>
         <div class="form-group">
           <label>Private Key</label>
-          <input type="password" id="private-key" placeholder="0x...">
-          <div class="form-hint">Optional. Used for signing transactions. A demo keypair is generated if omitted.</div>
+          <input type="password" id="private-key" placeholder="0x..." oninput="validatePrivateKey()">
+          <div class="form-hint" id="pk-hint">Optional. Used for signing transactions. A demo keypair is generated if omitted.</div>
+          <div id="pk-error" style="display:none;font-size:11px;color:#ff3d5a;margin-top:4px;"></div>
         </div>
         <div class="form-group">
           <label>0G Compute API Key (Optional)</label>
@@ -2240,6 +2246,7 @@ function resetWizardUI() {
   document.getElementById('agent-name').value = '';
   document.getElementById('agent-ens').value = '';
   document.getElementById('agent-desc').value = '';
+  document.getElementById('agent-skills').value = '';
   document.getElementById('agent-network').value = 'sepolia';
   document.getElementById('value-limit').value = '100';
   document.getElementById('endpoints').value = '';
@@ -2353,6 +2360,8 @@ function gatherStepData() {
       const slug = toSlug(wizardData.name);
       wizardData.ens = wizardData.swarmId ? buildAgentENS(slug, wizardData.swarmId) : document.getElementById('agent-ens').value.trim();
       wizardData.description = document.getElementById('agent-desc').value.trim();
+      wizardData.skills = document.getElementById('agent-skills').value.trim()
+        .split(',').map(s => s.trim()).filter(Boolean);
       wizardData.network = document.getElementById('agent-network').value;
       break;
     case 3:
@@ -2454,6 +2463,7 @@ function buildReview() {
     <div class="review-row"><span class="label">Name</span><span class="value">${esc(wizardData.name || '-')}</span></div>
     <div class="review-row"><span class="label">ENS</span><span class="value">${esc(wizardData.ens || '-')}</span></div>
     <div class="review-row"><span class="label">Type</span><span class="value">${esc(wizardData.typeName || '-')}</span></div>
+    <div class="review-row"><span class="label">Skills</span><span class="value">${esc((wizardData.skills || []).join(', ') || 'None')}</span></div>
     <div class="review-row"><span class="label">Network</span><span class="value">${esc({sepolia:'Sepolia',og_testnet:'0G Testnet',mainnet:'Ethereum Mainnet',og_mainnet:'0G Mainnet'}[wizardData.network] || wizardData.network)}</span></div>
   `;
 
