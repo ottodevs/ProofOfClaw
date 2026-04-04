@@ -1,5 +1,6 @@
 use anyhow::Result;
 use tracing::{info, warn};
+use crate::api::{ActivityItem, SharedState};
 use crate::core::config::AgentConfig;
 use crate::integrations::zero_g::{ZeroGCompute, ZeroGStorage};
 use crate::integrations::ens_dm3::DM3Client;
@@ -10,6 +11,7 @@ pub struct ProofOfClawAgent {
     config: AgentConfig,
     adapter: IronClawAdapter,
     proof_generator: ProofGenerator,
+    state: Option<SharedState>,
 }
 
 impl ProofOfClawAgent {
@@ -31,11 +33,16 @@ impl ProofOfClawAgent {
             });
         let proof_generator = ProofGenerator::new(true, image_id);
 
-        Ok(Self { config, adapter, proof_generator })
+        Ok(Self { config, adapter, proof_generator, state: None })
     }
 
     pub fn id(&self) -> &str {
         &self.config.agent_id
+    }
+
+    /// Attach the shared API state so the agent can update it.
+    pub fn set_state(&mut self, state: SharedState) {
+        self.state = Some(state);
     }
 
     /// Run with IronClaw runtime — registers hooks for tool execution, LLM calls,
@@ -75,9 +82,45 @@ impl ProofOfClawAgent {
         Ok(())
     }
 
-    /// Run in standalone mode — polls DM3 for messages and processes them.
+    /// Run in standalone mode — seeds initial state and waits for API-driven chat interactions.
     pub async fn run_standalone(&mut self) -> Result<()> {
         info!("Starting Proof of Claw Agent in standalone mode");
+        info!("Agent {} is ready and listening for requests via /api/chat", self.config.agent_id);
+
+        // Seed initial activity so the dashboard isn't empty on first load
+        if let Some(ref state) = self.state {
+            let now = chrono::Utc::now().timestamp();
+            let mut s = state.write().await;
+
+            s.activity.push(ActivityItem {
+                activity_type: "system".to_string(),
+                title: "Agent Started".to_string(),
+                description: format!("Proof of Claw agent {} initialized in standalone mode", self.config.agent_id),
+                timestamp: now,
+            });
+
+            s.activity.push(ActivityItem {
+                activity_type: "system".to_string(),
+                title: "Policy Loaded".to_string(),
+                description: format!(
+                    "Loaded {} allowed tools, max autonomous value {} wei",
+                    self.config.policy.allowed_tools.len(),
+                    self.config.policy.max_value_autonomous_wei
+                ),
+                timestamp: now,
+            });
+
+            s.activity.push(ActivityItem {
+                activity_type: "proof".to_string(),
+                title: "ZK Proof System Ready".to_string(),
+                description: "RISC Zero prover initialized. Ready to generate execution proofs.".to_string(),
+                timestamp: now,
+            });
+
+            info!("Seeded {} initial activity items into dashboard state", s.activity.len());
+        }
+
+        info!("Agent ready — send messages via POST /api/chat");
 
         loop {
             tokio::select! {

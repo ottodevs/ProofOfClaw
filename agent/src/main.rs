@@ -62,6 +62,7 @@ async fn main() -> Result<()> {
     {
         info!("Running in standalone mode");
         let mut agent = proof_agent::ProofOfClawAgent::new(config).await?;
+        agent.set_state(state);
         info!("Agent initialized: {}", agent.id());
 
         if let Err(e) = agent.run_standalone().await {

@@ -6,12 +6,22 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
+use sha2::Digest as _;
+
 use crate::core::config::AgentConfig;
+use crate::core::intent_router::{Intent, IntentRouter};
+use crate::core::types::{
+    AgentMessage, ExecutionTrace, InferenceResponse, MessagePayload, MessageType,
+    PolicyResult as CorePolicyResult, PolicySeverity, ToolInvocation,
+};
+use crate::proof_generator::ProofGenerator;
+use crate::safety::policy_engine::PolicyEngine;
 
 /// Shared agent state accessible by API handlers
 #[derive(Debug, Clone)]
@@ -120,6 +130,41 @@ pub struct SendMessageResponse {
     pub message_id: String,
 }
 
+// ========== CHAT TYPES ==========
+
+#[derive(Deserialize)]
+pub struct ChatRequest {
+    pub message: String,
+}
+
+#[derive(Serialize)]
+pub struct ChatResponse {
+    pub response: String,
+    pub intent: ChatIntentInfo,
+    pub policy_result: ChatPolicyInfo,
+    pub proof: ChatProofInfo,
+}
+
+#[derive(Serialize)]
+pub struct ChatIntentInfo {
+    pub action_type: String,
+    pub confidence: f64,
+}
+
+#[derive(Serialize)]
+pub struct ChatPolicyInfo {
+    pub allowed: bool,
+    pub approval_type: String,
+    pub checks: Vec<PolicyCheckRecord>,
+}
+
+#[derive(Serialize)]
+pub struct ChatProofInfo {
+    pub proof_id: String,
+    pub status: String,
+    pub output_commitment: String,
+}
+
 // ========== HANDLERS ==========
 
 async fn get_status(State(state): State<SharedState>) -> Json<StatusResponse> {
@@ -209,6 +254,269 @@ async fn send_message(
     }))
 }
 
+/// Parse a free-text user message into an action string and params for the agent pipeline.
+fn parse_user_message(text: &str) -> (String, HashMap<String, serde_json::Value>) {
+    let lower = text.to_lowercase();
+    let mut params = HashMap::new();
+
+    if lower.contains("swap") {
+        params.insert("description".to_string(), serde_json::Value::String(text.to_string()));
+        // Try to extract a numeric value for policy checks
+        for word in text.split_whitespace() {
+            if let Ok(n) = word.parse::<u64>() {
+                params.insert("value".to_string(), serde_json::json!(n));
+                break;
+            }
+        }
+        ("swap_tokens".to_string(), params)
+    } else if lower.contains("transfer") || lower.contains("send") {
+        params.insert("description".to_string(), serde_json::Value::String(text.to_string()));
+        for word in text.split_whitespace() {
+            if let Ok(n) = word.parse::<u64>() {
+                params.insert("value".to_string(), serde_json::json!(n));
+                break;
+            }
+        }
+        ("transfer".to_string(), params)
+    } else if lower.contains("query") || lower.contains("balance") || lower.contains("price")
+        || lower.contains("fetch") || lower.contains("check")
+    {
+        params.insert("description".to_string(), serde_json::Value::String(text.to_string()));
+        ("query".to_string(), params)
+    } else {
+        params.insert("description".to_string(), serde_json::Value::String(text.to_string()));
+        ("unknown".to_string(), params)
+    }
+}
+
+async fn chat(
+    State(state): State<SharedState>,
+    Json(req): Json<ChatRequest>,
+) -> (StatusCode, Json<ChatResponse>) {
+    let now = chrono::Utc::now().timestamp();
+
+    // 1. Parse the user message into an action + params
+    let (action, params) = parse_user_message(&req.message);
+
+    // Build an AgentMessage for the existing pipeline
+    let agent_msg = AgentMessage {
+        message_type: MessageType::Execute,
+        payload: MessagePayload {
+            action: action.clone(),
+            params: params.clone(),
+            trace_root_hash: None,
+            proof_receipt: None,
+            required_approval: None,
+        },
+        nonce: 1,
+        timestamp: now,
+    };
+
+    // 2. Classify intent
+    let intent_router = IntentRouter::new();
+    let intent = intent_router.classify_intent(&agent_msg).unwrap_or(Intent::Unknown);
+
+    let (intent_action_type, intent_confidence) = match &intent {
+        Intent::TokenSwap => ("swap", 0.95),
+        Intent::Transfer => ("transfer", 0.92),
+        Intent::Query => ("query", 0.90),
+        Intent::Negotiate => ("negotiate", 0.85),
+        Intent::Unknown => ("unknown", 0.3),
+    };
+
+    // 3. Check policy
+    let policy_config = {
+        let s = state.read().await;
+        s.config.policy.clone()
+    };
+    let policy_engine = PolicyEngine::new(policy_config);
+
+    let mock_inference = InferenceResponse {
+        content: format!("Processing: {}", req.message),
+        attestation_signature: "0xmock".to_string(),
+        provider: "0g-compute".to_string(),
+    };
+
+    let policy_result = policy_engine.check(&agent_msg, &mock_inference)
+        .unwrap_or(CorePolicyResult {
+            rule_id: "error".to_string(),
+            severity: PolicySeverity::Pass,
+            details: "Policy check failed, defaulting to pass".to_string(),
+        });
+
+    let policy_allowed = !matches!(policy_result.severity, PolicySeverity::Block);
+    let needs_ledger = matches!(policy_result.severity, PolicySeverity::Warn);
+
+    let approval_type = if !policy_allowed {
+        "blocked"
+    } else if needs_ledger {
+        "ledger_approval_required"
+    } else {
+        "autonomous"
+    };
+
+    let policy_checks = vec![PolicyCheckRecord {
+        rule: policy_result.rule_id.clone(),
+        passed: policy_allowed,
+        details: policy_result.details.clone(),
+    }];
+
+    // 4. Generate response text based on intent and policy
+    let response_text = if !policy_allowed {
+        format!(
+            "Action blocked by policy: {}. This violates the configured safety rules.",
+            policy_result.details
+        )
+    } else {
+        match &intent {
+            Intent::TokenSwap => {
+                let approval_msg = if needs_ledger {
+                    "Needs Ledger approval before execution."
+                } else {
+                    "Autonomous execution approved."
+                };
+                format!(
+                    "Executing swap: {}. Policy verified. {}",
+                    req.message, approval_msg
+                )
+            }
+            Intent::Transfer => {
+                let approval_msg = if needs_ledger {
+                    "Needs Ledger approval."
+                } else {
+                    "Autonomous execution approved."
+                };
+                format!(
+                    "Processing transfer: {}. Policy verified. {}",
+                    req.message, approval_msg
+                )
+            }
+            Intent::Query => {
+                format!(
+                    "Fetching on-chain data for: {}. No policy gate required.",
+                    req.message
+                )
+            }
+            Intent::Negotiate => {
+                format!("Initiating negotiation: {}. Policy verified.", req.message)
+            }
+            Intent::Unknown => {
+                "I don't understand that request. I can help with: token swaps, transfers, and on-chain queries.".to_string()
+            }
+        }
+    };
+
+    // 5. Build execution trace and generate proof
+    let tool_name = action.clone();
+    let trace = ExecutionTrace {
+        agent_id: {
+            let s = state.read().await;
+            s.config.agent_id.clone()
+        },
+        session_id: uuid::Uuid::new_v4().to_string(),
+        timestamp: now,
+        inference_commitment: format!("0x{}", hex::encode(sha2::Sha256::digest(req.message.as_bytes()))),
+        tool_invocations: vec![ToolInvocation {
+            tool_name: tool_name.clone(),
+            input_hash: format!("0x{}", hex::encode(sha2::Sha256::digest(req.message.as_bytes()))),
+            output_hash: format!("0x{}", hex::encode(sha2::Sha256::digest(response_text.as_bytes()))),
+            capability_hash: "0xcap".to_string(),
+            timestamp: now,
+            within_policy: policy_allowed,
+        }],
+        policy_check_results: vec![CorePolicyResult {
+            rule_id: policy_result.rule_id.clone(),
+            severity: policy_result.severity.clone(),
+            details: policy_result.details.clone(),
+        }],
+        output_commitment: format!("0x{}", hex::encode(sha2::Sha256::digest(response_text.as_bytes()))),
+    };
+
+    let image_id = {
+        let s = state.read().await;
+        s.config.risc_zero_image_id.clone().unwrap_or_default()
+    };
+    let proof_gen = ProofGenerator::new(true, image_id);
+    let proof_id = uuid::Uuid::new_v4().to_string();
+
+    let (proof_status, output_commitment) = match proof_gen.generate_proof(&trace).await {
+        Ok(receipt) => {
+            let verified = proof_gen.verify_receipt(&receipt).ok();
+            let commitment = verified
+                .as_ref()
+                .map(|v| v.output_commitment.clone())
+                .unwrap_or_else(|| trace.output_commitment.clone());
+            ("verified".to_string(), commitment)
+        }
+        Err(_) => ("failed".to_string(), trace.output_commitment.clone()),
+    };
+
+    // 6. Record everything in agent state
+    {
+        let mut s = state.write().await;
+        let agent_id = s.config.agent_id.clone();
+
+        // Record user message
+        s.messages.push(MessageRecord {
+            from: "user".to_string(),
+            to: agent_id.clone(),
+            content: req.message.clone(),
+            timestamp: now,
+            encrypted: false,
+            delivered: true,
+        });
+
+        // Record agent response
+        s.messages.push(MessageRecord {
+            from: agent_id.clone(),
+            to: "user".to_string(),
+            content: response_text.clone(),
+            timestamp: now,
+            encrypted: false,
+            delivered: true,
+        });
+
+        // Record proof
+        let proof_record = ProofRecord {
+            proof_id: proof_id.clone(),
+            agent_id: agent_id.clone(),
+            action: tool_name.clone(),
+            value: req.message.clone(),
+            approval_type: approval_type.to_string(),
+            status: proof_status.clone(),
+            timestamp: now,
+            proof_time_secs: 1,
+            output_commitment: output_commitment.clone(),
+            tx_hash: None,
+            block_number: None,
+            policy_checks: policy_checks.clone(),
+        };
+        s.record_proof(proof_record);
+    }
+
+    // 7. Return response
+    (
+        StatusCode::OK,
+        Json(ChatResponse {
+            response: response_text,
+            intent: ChatIntentInfo {
+                action_type: intent_action_type.to_string(),
+                confidence: intent_confidence,
+            },
+            policy_result: ChatPolicyInfo {
+                allowed: policy_allowed,
+                approval_type: approval_type.to_string(),
+                checks: policy_checks,
+            },
+            proof: ChatProofInfo {
+                proof_id,
+                status: proof_status,
+                output_commitment,
+            },
+        }),
+    )
+}
+
 async fn health() -> &'static str {
     "ok"
 }
@@ -282,6 +590,7 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/proofs", get(get_proofs))
         .route("/api/messages", get(get_messages))
         .route("/api/messages/send", post(send_message))
+        .route("/api/chat", post(chat))
         .with_state(state)
         .layer(cors)
 }

@@ -34,7 +34,7 @@ cargo run --release
 
 ## Note
 
-For hackathon/demo purposes, you can use **Boundless** (RISC Zero's proving marketplace) instead of local proving:
+For production use, you can use **Boundless** (RISC Zero's proving marketplace) instead of local proving:
 - No GPU required
 - Proof generation outsourced to network
 - ~$0.30-$30 per proof depending on complexity

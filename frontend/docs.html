@@ -734,6 +734,95 @@ tr:hover td { background: rgba(255,255,255,0.015); }
   border-radius: 4px;
 }
 
+/* ========== STATUS BADGES ========== */
+.status-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.2s;
+}
+
+.status-row:hover { border-color: rgba(255,255,255,0.1); }
+
+.status-badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.status-badge.working { background: rgba(0,230,118,0.12); color: var(--green); border: 1px solid rgba(0,230,118,0.25); }
+.status-badge.partial { background: var(--amber-glow); color: var(--amber); border: 1px solid rgba(255,179,0,0.25); }
+.status-badge.stub { background: rgba(255,61,90,0.1); color: var(--red); border: 1px solid rgba(255,61,90,0.2); }
+.status-badge.missing { background: rgba(255,61,90,0.1); color: var(--red); border: 1px solid rgba(255,61,90,0.2); }
+
+.status-name {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  min-width: 180px;
+}
+
+.status-detail {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.todo-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+}
+
+.todo-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.todo-list li:last-child { border-bottom: none; }
+
+.todo-priority {
+  flex-shrink: 0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.15rem;
+}
+
+.todo-priority.high { background: rgba(255,61,90,0.1); color: var(--red); }
+.todo-priority.medium { background: var(--amber-glow); color: var(--amber); }
+.todo-priority.nice { background: rgba(0,230,118,0.08); color: var(--green); }
+
+@media (max-width: 900px) {
+  .status-row { flex-wrap: wrap; }
+  .status-name { min-width: auto; }
+}
+
 /* ========== ANIMATIONS ========== */
 .fade-in {
   opacity: 0;
@@ -876,6 +965,13 @@ tr:hover td { background: rgba(255,255,255,0.015); }
     <a href="#config" class="sidebar-link">Configuration</a>
     <a href="#repo-structure" class="sidebar-link">Repository Structure</a>
     <a href="#bounties" class="sidebar-link">Target Bounties</a>
+  </div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Status</div>
+    <a href="#status" class="sidebar-link">What's Working</a>
+    <a href="#incomplete" class="sidebar-link">What's Incomplete</a>
+    <a href="#roadmap" class="sidebar-link">Roadmap</a>
   </div>
 </aside>
 
@@ -1407,6 +1503,150 @@ MAX_VALUE_AUTONOMOUS_WEI=1000000000000000000</pre>
     <div class="bounty-integration">Ledger DMK/DSK for human approval, Clear Signing (ERC-7730)</div>
   </div>
 </div>
+
+<!-- STATUS -->
+<h2 id="status" class="section-anchor fade-in"><span class="section-icon icon-green">&#x2714;</span> What's Working</h2>
+
+<div class="status-grid fade-in">
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">Rust Agent Runtime</span>
+    <span class="status-detail">Compiles cleanly, 35/35 tests pass. Full agent loop, intent router, REST API on port 8420.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">Policy Engine</span>
+    <span class="status-detail">Tool allowlist enforcement, value threshold checks, severity levels (Block/Warn/Sanitize/Pass).</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">Injection Detector</span>
+    <span class="status-detail">Regex-based prompt injection detection with case-insensitive matching.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">WASM Sandbox</span>
+    <span class="status-detail">Wasmtime-based isolated execution for untrusted tools with capability validation.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">Tool Registry</span>
+    <span class="status-detail">Content-addressable registration with SHA256 capability hashes. Built-in tools: swap, transfer, query.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">0G Compute</span>
+    <span class="status-detail">HTTP inference with TEE attestation extraction, graceful fallback to content hash.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">0G Storage</span>
+    <span class="status-detail">Trace upload/retrieval with content-addressable root hashes, graceful degradation when offline.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">ENS + DM3</span>
+    <span class="status-detail">Full namehash, on-chain resolution, DM3 profile lookup with 3-tier fallback, encrypted messaging.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">EIP-8004</span>
+    <span class="status-detail">Identity registration, reputation queries, validation history, trust threshold checks with bootstrap phase.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">iNFT (ERC-7857)</span>
+    <span class="status-detail">Agent minting with encrypted metadata on 0G Storage.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">Proof Generator</span>
+    <span class="status-detail">Supports Boundless (remote), local RISC Zero, and mock (dev) backends.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">Smart Contracts</span>
+    <span class="status-detail">ProofOfClawVerifier, EIP8004Integration, ProofOfClawINFT &mdash; all compile with Foundry.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">RISC Zero Guest</span>
+    <span class="status-detail">Real zkVM guest program with full policy verification logic.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">Frontend UI</span>
+    <span class="status-detail">All 7 pages functional. Live API mode + mock fallback. Search, copy, responsive design.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge working">Working</span>
+    <span class="status-name">ENS Resolver (JS)</span>
+    <span class="status-detail">Real on-chain resolution via RPC, multi-network support (Sepolia, Mainnet, 0G).</span>
+  </div>
+</div>
+
+<h2 id="incomplete" class="section-anchor fade-in"><span class="section-icon icon-amber">&#x26A0;</span> What's Incomplete</h2>
+
+<div class="status-grid fade-in">
+  <div class="status-row">
+    <span class="status-badge stub">Stub</span>
+    <span class="status-name">Ledger Approval Gate</span>
+    <span class="status-detail">Always returns <code>Ok(true)</code> &mdash; no actual Ledger device communication. 15-line placeholder in <code>agent/src/integrations/ledger.rs</code>.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge partial">Mock Data</span>
+    <span class="status-name">RISC Zero Host</span>
+    <span class="status-detail">Real RISC Zero host program but seeds hardcoded test traces instead of accepting real agent input.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge missing">Missing</span>
+    <span class="status-name">Contract Tests</span>
+    <span class="status-detail">Zero Foundry test files. No <code>test/</code> directory in contracts.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge partial">Partial</span>
+    <span class="status-name">ERC-7730 Metadata</span>
+    <span class="status-detail">Contract address is <code>0x000...000</code> (needs post-deployment update). Missing some method display formats.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge partial">Partial</span>
+    <span class="status-name">ProofOfClawINFT</span>
+    <span class="status-detail"><code>balanceOf()</code> is O(n) without owner mapping. Missing <code>safeTransferFrom</code> receiver validation.</span>
+  </div>
+  <div class="status-row">
+    <span class="status-badge partial">In-memory</span>
+    <span class="status-name">Job Scheduler</span>
+    <span class="status-detail">Basic HashMap-based tracking with no persistence. State lost on restart.</span>
+  </div>
+</div>
+
+<h2 id="roadmap" class="section-anchor fade-in"><span class="section-icon icon-cyan">&#x2692;</span> Roadmap</h2>
+
+<h3 class="fade-in">High Priority</h3>
+<ul class="todo-list fade-in">
+  <li><span class="todo-priority high">High</span> Implement Ledger DMK/DSK approval flow (replace stub in <code>agent/src/integrations/ledger.rs</code>)</li>
+  <li><span class="todo-priority high">High</span> Write Foundry contract tests (<code>contracts/test/</code>)</li>
+  <li><span class="todo-priority high">High</span> Wire RISC Zero host to accept real execution traces from the agent</li>
+  <li><span class="todo-priority high">High</span> Deploy contracts to testnet and update ERC-7730 metadata with real addresses</li>
+</ul>
+
+<h3 class="fade-in">Medium Priority</h3>
+<ul class="todo-list fade-in">
+  <li><span class="todo-priority medium">Med</span> Add <code>safeTransferFrom</code> ERC-721 receiver validation to ProofOfClawINFT</li>
+  <li><span class="todo-priority medium">Med</span> Optimize <code>balanceOf()</code> with owner-to-tokenIds mapping in ProofOfClawINFT</li>
+  <li><span class="todo-priority medium">Med</span> Complete ERC-7730 Clear Signing metadata for all contract methods</li>
+  <li><span class="todo-priority medium">Med</span> Add persistent storage for job scheduler (currently in-memory)</li>
+  <li><span class="todo-priority medium">Med</span> End-to-end integration test: agent &rarr; 0G &rarr; RISC Zero &rarr; on-chain verification</li>
+</ul>
+
+<h3 class="fade-in">Nice to Have</h3>
+<ul class="todo-list fade-in">
+  <li><span class="todo-priority nice">Nice</span> Production RISC Zero proof generation via Boundless (currently mock in dev)</li>
+  <li><span class="todo-priority nice">Nice</span> Multi-chain deployment scripts and ERC-7730 metadata</li>
+  <li><span class="todo-priority nice">Nice</span> Agent dashboard real-time WebSocket updates (currently polling)</li>
+  <li><span class="todo-priority nice">Nice</span> DM3 delivery service node setup and documentation</li>
+  <li><span class="todo-priority nice">Nice</span> IronClaw full integration mode testing</li>
+</ul>
 
 <!-- FOOTER -->
 <div class="docs-footer">

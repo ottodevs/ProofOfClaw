@@ -28,6 +28,7 @@
   --font-display: 'Syne', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --sidebar-width: 240px;
+  --sidebar-w-collapsed: 60px;
 }
 
 body {
@@ -201,6 +202,47 @@ body::after {
   color: var(--text-primary);
   border-color: var(--border-cyan);
 }
+
+/* Sidebar collapse */
+.sidebar-toggle {
+  position: absolute;
+  top: 12px;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 201;
+  transition: all 0.2s;
+}
+.sidebar-toggle:hover {
+  color: var(--cyan);
+  border-color: var(--border-cyan);
+  background: var(--bg-card);
+}
+
+.sidebar { transition: width 0.25s ease; }
+.main-area { transition: margin-left 0.25s ease; }
+
+body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
+body.sidebar-collapsed .sidebar .logo-text { display: none; }
+body.sidebar-collapsed .sidebar-logo { justify-content: center; }
+body.sidebar-collapsed .sidebar-nav li a { justify-content: center; padding: 0.7rem 0; font-size: 0; gap: 0; }
+body.sidebar-collapsed .sidebar-nav li a .nav-icon { font-size: 1.1rem; width: auto; }
+body.sidebar-collapsed .sidebar-bottom { padding: 0.75rem 0.5rem; }
+body.sidebar-collapsed .sidebar-bottom .btn-new-agent { font-size: 0; padding: 0.6rem; letter-spacing: 0; }
+body.sidebar-collapsed .sidebar-bottom .btn-new-agent::after { content: '+'; font-size: 1.2rem; font-weight: 700; letter-spacing: 0; }
+body.sidebar-collapsed .sidebar-bottom .btn-home { display: none; }
+body.sidebar-collapsed .main-area { margin-left: var(--sidebar-w-collapsed); }
+body.sidebar-collapsed .sidebar-toggle { transform: rotate(180deg); }
+body.sidebar-collapsed #poc-connection-slot { display: none; }
 
 /* ═══════════════════════════════════════════
    MAIN AREA
@@ -620,6 +662,57 @@ body::after {
   font-size: 0.85rem;
 }
 
+/* ── Thinking Indicator ── */
+.message.thinking .message-content {
+  color: var(--text-dim);
+  animation: pulse-thinking 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-thinking {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* ── Proof Badge ── */
+.message-proof {
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--cyan);
+  background: rgba(0, 229, 255, 0.06);
+  border: 1px solid var(--border-cyan);
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+
+/* ── Live Mode Banner ── */
+.live-mode-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  background: rgba(0, 230, 118, 0.06);
+  border-bottom: 1px solid rgba(0, 230, 118, 0.15);
+  font-size: 0.65rem;
+  color: var(--green);
+  flex-shrink: 0;
+}
+
+.live-mode-banner .live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ── Send button disabled state ── */
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -633,6 +726,7 @@ body::after {
      SIDEBAR
      ═══════════════════════════════════════════ -->
 <aside class="sidebar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar">&#x276E;</button>
   <a href="index.html" class="sidebar-logo">
     <span class="claw-symbol">&#x27C1;</span>
     <span class="logo-text">Proof of Claw</span>
@@ -706,13 +800,15 @@ body::after {
   </div>
 </div>
 
+<script src="poc-api.js"></script>
 <script>
 (function() {
   // ── State ──
   let currentAgent = null;   // "you" — the agent using this page
   let contacts = [];
   let activeContactId = null;
-  const conversations = {};  // contactId -> [{sender, content, time, sent}]
+  const conversations = {};  // contactId -> [{sender, content, time, sent, proof?}]
+  let isSending = false;     // prevent double-sends while waiting for backend
 
   // ── DOM refs ──
   const agentSelector = document.getElementById('agent-selector');
@@ -724,6 +820,16 @@ body::after {
   const composeArea = document.getElementById('compose-area');
   const messageInput = document.getElementById('message-input');
 
+  // ── Connection helpers ──
+  function isLive() {
+    return typeof PocAPI !== 'undefined' && PocAPI.isConnected();
+  }
+
+  function getBaseUrl() {
+    const conn = PocAPI.getConnection();
+    return conn ? conn.url : null;
+  }
+
   // ── Default agents if localStorage is empty ──
   const DEFAULT_AGENTS = [
     { name: 'alice', ensName: 'alice.proofclaw.eth', status: 'active' },
@@ -734,7 +840,6 @@ body::after {
 
   // ── Pre-populated conversation for alice <-> bob ──
   function getBobConversation(myName) {
-    const isAlice = myName.includes('alice');
     const meName = myName;
     const bobName = 'bob.proofclaw.eth';
     return [
@@ -772,7 +877,8 @@ body::after {
           agents = parsed.map(a => ({
             name: a.name || a.agentName || 'unnamed',
             ensName: a.ensName || a.ens || ((a.name || a.agentName || 'unnamed') + '.proofclaw.eth'),
-            status: a.status || 'active'
+            status: a.status || 'active',
+            live: !!a.live
           }));
         }
       }
@@ -796,25 +902,62 @@ body::after {
     agents.forEach(a => {
       const opt = document.createElement('option');
       opt.value = a.ensName;
-      opt.textContent = a.ensName;
+      opt.textContent = a.ensName + (a.live ? ' [LIVE]' : '');
       agentSelector.appendChild(opt);
     });
 
-    // Pick current agent from URL or default to first
-    const urlAgent = getAgentFromURL();
-    if (urlAgent) {
-      const found = agents.find(a => a.ensName === urlAgent || a.name === urlAgent);
-      currentAgent = found ? found.ensName : agents[0].ensName;
+    // If connected via PocAPI, prefer the connected agent
+    const conn = isLive() ? PocAPI.getConnection() : null;
+    if (conn) {
+      const connEns = conn.ens || (conn.agentId + '.proofclaw.eth');
+      const found = agents.find(a => a.ensName === connEns || a.name === conn.agentId);
+      currentAgent = found ? found.ensName : connEns;
     } else {
-      currentAgent = agents[0].ensName;
+      // Pick current agent from URL or default to first
+      const urlAgent = getAgentFromURL();
+      if (urlAgent) {
+        const found = agents.find(a => a.ensName === urlAgent || a.name === urlAgent);
+        currentAgent = found ? found.ensName : agents[0].ensName;
+      } else {
+        currentAgent = agents[0].ensName;
+      }
     }
     agentSelector.value = currentAgent;
+
+    // Show live mode banner if connected
+    if (isLive()) {
+      showLiveModeBanner();
+    }
 
     // Build contacts: all agents except self
     buildContacts(agents);
 
-    // Pre-populate conversations
-    seedConversations();
+    // Pre-populate conversations (only in demo/offline mode)
+    if (!isLive()) {
+      seedConversations();
+    } else {
+      // In live mode, start with empty conversations; the agent contact is the backend
+      contacts.forEach(c => {
+        conversations[c.ensName] = [];
+        c.lastMessage = 'No messages yet';
+        c.lastTime = '';
+      });
+      // Add a special "Agent" contact representing the connected backend
+      const connAgentName = conn.agentId || 'agent';
+      const connContact = {
+        ensName: connAgentName,
+        name: connAgentName,
+        online: true,
+        lastMessage: 'Connected — send a message to interact',
+        lastTime: 'now',
+        isBackendAgent: true
+      };
+      // Only add if not already in contacts
+      if (!contacts.find(c => c.ensName === connAgentName)) {
+        contacts.unshift(connContact);
+      }
+      conversations[connAgentName] = [];
+    }
 
     // Render contacts
     renderContacts();
@@ -825,6 +968,16 @@ body::after {
     } else {
       showEmptyState();
     }
+  }
+
+  function showLiveModeBanner() {
+    const conn = PocAPI.getConnection();
+    const banner = document.createElement('div');
+    banner.className = 'live-mode-banner';
+    banner.innerHTML = '<span class="live-dot"></span> Connected to live agent: ' +
+      escapeHtml(conn.agentId || conn.url) + ' — messages sent via /api/chat';
+    const chatPanel = document.getElementById('chat-panel');
+    chatPanel.insertBefore(banner, chatPanel.firstChild);
   }
 
   function buildContacts(agents) {
@@ -869,7 +1022,7 @@ body::after {
         <div class="contact-top-row">
           <span class="contact-name">
             <span class="status-dot ${c.online ? 'online' : ''}"></span>
-            ${escapeHtml(c.ensName)}
+            ${escapeHtml(c.ensName)}${c.isBackendAgent ? ' <span style="color:var(--green);font-size:0.6rem;">[LIVE]</span>' : ''}
           </span>
           <span class="contact-time">${escapeHtml(c.lastTime)}</span>
         </div>
@@ -915,22 +1068,58 @@ body::after {
     div.className = 'message ' + (m.sent ? 'sent' : 'received');
     const senderLabel = m.sent ? escapeHtml(currentAgent) + ' (You)' : escapeHtml(m.sender);
     const metaText = m.sent ? 'Encrypted via DM3 &bull; Delivered' : 'Encrypted via DM3 &bull; Delivered via delivery service';
+    let proofHtml = '';
+    if (m.proof) {
+      const proofId = m.proof.proof_id ? m.proof.proof_id.substring(0, 12) + '...' : 'n/a';
+      const status = m.proof.status || 'verified';
+      const approvalType = m.proof.approval_type || m.proof.policy_result?.approval_type || 'autonomous';
+      proofHtml = `<div class="message-proof">&#x2713; Proof ${escapeHtml(status)} | ${escapeHtml(approvalType)} | proof_id: ${escapeHtml(proofId)}</div>`;
+    }
     div.innerHTML = `
       <div class="message-header">
         <span class="message-sender">${senderLabel}</span>
         <span class="message-time">${escapeHtml(m.time)}</span>
       </div>
       <div class="message-content">${escapeHtml(m.content)}</div>
+      ${proofHtml}
       <div class="message-meta">
         <span class="meta-icon">&#x2713;</span> ${metaText}
       </div>`;
     return div;
   }
 
+  // ── Thinking Indicator ──
+  function addThinkingBubble() {
+    const div = document.createElement('div');
+    div.className = 'message received thinking';
+    div.id = 'thinking-bubble';
+    div.innerHTML = `
+      <div class="message-header">
+        <span class="message-sender">${escapeHtml(activeContactId)}</span>
+        <span class="message-time">...</span>
+      </div>
+      <div class="message-content">Thinking...</div>`;
+    messagesList.appendChild(div);
+    scrollToBottom();
+    return div;
+  }
+
+  function removeThinkingBubble() {
+    const bubble = document.getElementById('thinking-bubble');
+    if (bubble) bubble.remove();
+  }
+
+  // ── Check if the active contact is the live backend agent ──
+  function isActiveContactLive() {
+    if (!isLive()) return false;
+    const contact = contacts.find(c => c.ensName === activeContactId);
+    return contact && contact.isBackendAgent;
+  }
+
   // ── Send Message ──
-  window.sendMessage = function() {
+  window.sendMessage = async function() {
     const text = messageInput.value.trim();
-    if (!text || !activeContactId) return;
+    if (!text || !activeContactId || isSending) return;
 
     const now = new Date();
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -952,23 +1141,113 @@ body::after {
       contact.lastTime = timeStr;
     }
 
-    // Add message to DOM
+    // Add message to DOM (optimistic UI)
     const el = createMessageEl(msg);
-    // Remove empty state if present
     const emptyState = messagesList.querySelector('.empty-chat');
     if (emptyState) emptyState.remove();
 
     messagesList.appendChild(el);
     scrollToBottom();
     messageInput.value = '';
+    messageInput.style.height = 'auto';
     renderContacts();
 
-    // Simulate "Sending..." -> "Delivered"
+    // Show sending status
     const metaEl = el.querySelector('.message-meta');
     metaEl.innerHTML = '<span class="meta-icon">&#x23F3;</span> Encrypted via DM3 &bull; Sending...';
-    setTimeout(() => {
+
+    // ── LIVE MODE: call backend /api/chat ──
+    if (isActiveContactLive()) {
+      isSending = true;
+      const sendBtn = document.querySelector('.send-btn');
+      if (sendBtn) sendBtn.disabled = true;
+
+      // Mark sent message as delivered
       metaEl.innerHTML = '<span class="meta-icon">&#x2713;</span> Encrypted via DM3 &bull; Delivered';
-    }, 800);
+
+      // Show thinking indicator
+      const thinkingEl = addThinkingBubble();
+
+      try {
+        const baseUrl = getBaseUrl();
+        const response = await fetch(baseUrl + '/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+
+        if (!response.ok) {
+          throw new Error('Backend returned ' + response.status);
+        }
+
+        const data = await response.json();
+
+        // Remove thinking bubble
+        removeThinkingBubble();
+
+        // Build agent response message
+        const responseTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const agentMsg = {
+          sender: activeContactId,
+          content: data.response || '(no response)',
+          time: responseTime,
+          sent: false,
+          proof: data.proof || null
+        };
+
+        // If proof data exists in policy_result, merge it
+        if (!agentMsg.proof && data.policy_result) {
+          agentMsg.proof = {
+            proof_id: data.policy_result.proof_id,
+            status: data.policy_result.status || 'verified',
+            approval_type: data.policy_result.approval_type || 'autonomous'
+          };
+        }
+
+        conversations[activeContactId].push(agentMsg);
+
+        // Add response to DOM
+        const responseEl = createMessageEl(agentMsg);
+        messagesList.appendChild(responseEl);
+        scrollToBottom();
+
+        // Update contact preview
+        if (contact) {
+          const preview = agentMsg.content;
+          contact.lastMessage = preview.length > 40 ? preview.substring(0, 40) + '...' : preview;
+          contact.lastTime = responseTime;
+        }
+        renderContacts();
+
+      } catch (err) {
+        // Remove thinking bubble
+        removeThinkingBubble();
+
+        // Show error as a system message
+        const errTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const errMsg = {
+          sender: 'system',
+          content: 'Failed to reach agent: ' + err.message,
+          time: errTime,
+          sent: false
+        };
+        conversations[activeContactId].push(errMsg);
+        const errEl = createMessageEl(errMsg);
+        errEl.style.borderColor = 'rgba(255, 61, 90, 0.3)';
+        errEl.querySelector('.message-content').style.color = 'var(--red)';
+        messagesList.appendChild(errEl);
+        scrollToBottom();
+      } finally {
+        isSending = false;
+        if (sendBtn) sendBtn.disabled = false;
+      }
+
+    } else {
+      // ── DEMO MODE: local-only behavior ──
+      setTimeout(() => {
+        metaEl.innerHTML = '<span class="meta-icon">&#x2713;</span> Encrypted via DM3 &bull; Delivered';
+      }, 800);
+    }
   };
 
   // ── Agent Selector Change ──
@@ -978,7 +1257,30 @@ body::after {
       activeContactId = null;
       const agents = loadAgents();
       buildContacts(agents);
-      seedConversations();
+
+      if (!isLive()) {
+        seedConversations();
+      } else {
+        const conn = PocAPI.getConnection();
+        contacts.forEach(c => {
+          conversations[c.ensName] = [];
+          c.lastMessage = 'No messages yet';
+          c.lastTime = '';
+        });
+        const connAgentName = conn.agentId || 'agent';
+        if (!contacts.find(c => c.ensName === connAgentName)) {
+          contacts.unshift({
+            ensName: connAgentName,
+            name: connAgentName,
+            online: true,
+            lastMessage: 'Connected — send a message to interact',
+            lastTime: 'now',
+            isBackendAgent: true
+          });
+          conversations[connAgentName] = [];
+        }
+      }
+
       renderContacts();
       if (contacts.length > 0) {
         selectContact(contacts[0].ensName);
@@ -1028,6 +1330,15 @@ body::after {
   init();
 })();
 </script>
-<script src="poc-api.js"></script>
+<script>
+// Sidebar collapse
+function toggleSidebar() {
+  document.body.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('poc-sidebar-collapsed', document.body.classList.contains('sidebar-collapsed'));
+}
+if (localStorage.getItem('poc-sidebar-collapsed') === 'true') {
+  document.body.classList.add('sidebar-collapsed');
+}
+</script>
 </body>
 </html>

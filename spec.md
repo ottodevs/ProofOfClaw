@@ -2,8 +2,6 @@
 
 **Provable Private Agent Framework**
 
-ETHGlobal Cannes 2026 — Hackathon Submission
-
 ---
 
 ## 1. Overview
@@ -395,7 +393,7 @@ fn main() {
 
 #### 4.4.3 Host Program — Remote Proving via Boundless
 
-Instead of running a local GPU prover (expensive, slow on hackathon hardware), we use **Boundless** — RISC Zero's decentralized proving marketplace (live on Base mainnet). The agent submits a proof request to Boundless, a network of permissionless provers competes to generate the proof, and the result is settled on-chain. This takes the proof generation burden off the agent entirely.
+Instead of running a local GPU prover, we use **Boundless** — RISC Zero's decentralized proving marketplace (live on Base mainnet). The agent submits a proof request to Boundless, a network of permissionless provers competes to generate the proof, and the result is settled on-chain. This takes the proof generation burden off the agent entirely.
 
 ```rust
 // host/src/main.rs — submits proof request to Boundless
@@ -437,7 +435,7 @@ async fn request_proof(
 - Proof cost is ~$0.30–$30 depending on computation complexity (vs. thousands on-chain)
 - Boundless settles the Groth16 proof on the destination chain, so the agent just submits the receipt
 - The Boundless Foundry Template provides a minimal integration scaffold for Solidity contracts
-- 363+ active provers on the network as of early 2026, with high availability
+- Hundreds of active provers on the network with high availability
 
 #### 4.4.4 On-Chain Verifier (Solidity)
 
@@ -1005,9 +1003,7 @@ proof-of-claw/
 
 ---
 
-## 8. Hackathon Deliverables
-
-### Demo Scenario
+## 8. Demo Scenario
 
 Two agents negotiate and execute a token swap:
 
@@ -1021,22 +1017,6 @@ Two agents negotiate and execute a token swap:
 8. Both owners see the pending approval on their Ledger devices with Clear Signing
 9. Both press approve — swap executes on-chain with verified proofs
 10. Both agents submit mutual reputation feedback to the EIP-8004 Reputation Registry
-
-### Submission Checklist
-
-- [ ] Public GitHub repo with README + setup instructions
-- [ ] Smart contracts deployed on testnet with verified source
-- [ ] Demo video (< 3 minutes)
-- [ ] Live demo link
-- [ ] Clear Signing JSON metadata file
-- [ ] Architecture diagram
-- [ ] ENS subname registrations on testnet
-- [ ] At least one successful RISC Zero proof verified on-chain
-- [ ] At least one DM3 encrypted message exchange between agents
-- [ ] At least one Ledger-approved transaction
-- [ ] EIP-8004 Identity Registry with at least two registered agents
-- [ ] EIP-8004 Reputation feedback submitted between agents after proven interaction
-- [ ] EIP-8004 Validation Registry recording RISC Zero proof verification results
 
 ---
 
@@ -1056,7 +1036,7 @@ Two agents negotiate and execute a token swap:
 
 ---
 
-## 10. Future Extensions (Post-Hackathon)
+## 10. Future Extensions
 
 - **Steel zkCoprocessor** — Prove historical on-chain state within the zkVM (e.g., verify oracle prices, check collateral ratios) without trusting the agent's local state
 - **Multi-agent DAOs** — Agents collectively govern a treasury, with each agent's vote proven via RISC Zero and aggregate decisions requiring M-of-N Ledger approvals

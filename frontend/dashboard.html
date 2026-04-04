@@ -31,6 +31,7 @@
   --font-display: 'Syne', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --sidebar-w: 240px;
+  --sidebar-w-collapsed: 60px;
   --topbar-h: 60px;
 }
 
@@ -194,6 +195,51 @@ body::after {
   color: var(--text-secondary);
   border-color: var(--border-cyan);
 }
+
+/* Sidebar collapse */
+.sidebar-toggle {
+  position: absolute;
+  top: 12px;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 201;
+  transition: all 0.2s;
+}
+.sidebar-toggle:hover {
+  color: var(--cyan);
+  border-color: var(--border-cyan);
+  background: var(--bg-card);
+}
+
+.sidebar { transition: width 0.25s ease; }
+.topbar { transition: left 0.25s ease; }
+.main { transition: margin-left 0.25s ease; }
+
+body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
+body.sidebar-collapsed .sidebar .logo-text { display: none; }
+body.sidebar-collapsed .sidebar-nav a { justify-content: center; padding: 0.65rem 0; }
+body.sidebar-collapsed .sidebar-nav a span:not(.nav-icon) { display: none; }
+body.sidebar-collapsed .sidebar-nav a .nav-icon { width: auto; font-size: 1.1rem; }
+body.sidebar-collapsed .sidebar-bottom { padding: 0.75rem 0.5rem 0; }
+body.sidebar-collapsed .sidebar-btn { font-size: 0; padding: 0.6rem; }
+body.sidebar-collapsed .sidebar-btn::before { font-size: 1rem; }
+body.sidebar-collapsed .sidebar-btn.primary { font-size: 0; }
+body.sidebar-collapsed .sidebar-btn.primary::after { content: '+'; font-size: 1.2rem; }
+body.sidebar-collapsed .sidebar-btn.ghost { display: none; }
+body.sidebar-collapsed .topbar { left: var(--sidebar-w-collapsed); }
+body.sidebar-collapsed .main { margin-left: var(--sidebar-w-collapsed); }
+body.sidebar-collapsed .sidebar-toggle { transform: rotate(180deg); }
+body.sidebar-collapsed #poc-connection-slot { display: none; }
 
 /* ======================================== */
 /* TOPBAR                                   */
@@ -698,6 +744,53 @@ body::after {
   .agent-header { flex-direction: column; }
   .agent-header-right { align-items: flex-start; }
 }
+
+/* ======================================== */
+/* LIVE BADGE                               */
+/* ======================================== */
+.live-badge {
+  background: rgba(0, 230, 118, 0.08);
+  border-color: rgba(0, 230, 118, 0.3) !important;
+  color: var(--green);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  gap: 0.4rem;
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse-live 1.5s ease-in-out infinite;
+}
+.live-text {
+  color: var(--green);
+}
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--green); }
+  50% { opacity: 0.5; box-shadow: 0 0 3px var(--green); }
+}
+
+/* Connection error banner */
+.live-error-banner {
+  background: rgba(255, 61, 90, 0.08);
+  border: 1px solid rgba(255, 61, 90, 0.3);
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.live-error-banner .error-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--red); flex-shrink: 0;
+}
 </style>
 </head>
 <body>
@@ -708,6 +801,7 @@ body::after {
 <!-- SIDEBAR                                  -->
 <!-- ======================================== -->
 <aside class="sidebar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar">&#x276E;</button>
   <a href="index.html" class="sidebar-logo">
     <span class="claw-icon">&#x27C1;</span>
     <span class="logo-text">Proof of Claw</span>
@@ -746,6 +840,10 @@ body::after {
     </select>
   </div>
   <div class="topbar-right">
+    <div class="status-badge live-badge" id="live-badge" style="display:none;">
+      <span class="live-dot"></span>
+      <span class="live-text">LIVE</span>
+    </div>
     <div class="status-badge" id="topbar-status">
       <span class="status-dot" id="topbar-dot"></span>
       <span id="topbar-status-text">Online</span>
@@ -871,6 +969,7 @@ body::after {
 
 </main>
 
+<script src="poc-api.js"></script>
 <script>
 // =====================================================
 // DEFAULT MOCK AGENTS (same as agents page)
@@ -1003,66 +1102,258 @@ function init() {
 
   if (currentAgent) {
     renderAgent();
-    startUptimeCounter();
-    seedActivity();
-    scheduleSimulations();
-    // If this agent is the live-connected one, poll live data
-    startLiveSync();
+
+    if (isLiveAgent()) {
+      // Connected to a live agent — poll real data, skip mock simulations
+      startLivePolling();
+    } else {
+      // No live connection — show mock data as before
+      startUptimeCounter();
+      seedActivity();
+      scheduleSimulations();
+    }
   } else {
     showEmptyState();
   }
 }
 
-// Live API sync — fetches real data from connected agent
-function startLiveSync() {
-  if (typeof PocAPI === 'undefined') return;
-  const conn = PocAPI.getConnection?.();
-  if (!conn || !currentAgent) return;
-  if (currentAgent.id !== conn.agentId) return;
+// =====================================================
+// LIVE POLLING
+// =====================================================
+let livePollingInterval = null;
+let liveConnected = false;
+let liveConsecutiveErrors = 0;
 
-  async function syncOnce() {
-    try {
-      const status = await PocAPI.fetchStatus(conn.url);
-      // Update stats on page
-      document.getElementById('stat-total').textContent = status.stats.total_actions;
-      document.getElementById('stat-autonomous').textContent = status.stats.autonomous_actions;
-      document.getElementById('stat-approved').textContent = status.stats.approved_actions;
-      document.getElementById('stat-violations').textContent = status.stats.violations;
-      document.getElementById('stat-proofs').textContent = status.stats.proofs_generated;
-      document.getElementById('stat-verified').textContent = status.stats.proofs_verified;
+function isLiveAgent() {
+  if (typeof PocAPI === 'undefined') return false;
+  if (!PocAPI.isConnected || !PocAPI.isConnected()) return false;
+  var conn = PocAPI.getConnection();
+  if (!conn || !currentAgent) return false;
+  // If current agent matches the connected agent, use live data
+  return currentAgent.id === conn.agentId;
+}
 
-      // Update uptime from server
-      const h = Math.floor(status.uptime_secs / 3600);
-      const m = Math.floor((status.uptime_secs % 3600) / 60);
-      const s = status.uptime_secs % 60;
-      document.getElementById('uptime').textContent = `${h}h ${m}m ${s}s`;
+function showLiveBadge(visible) {
+  var badge = document.getElementById('live-badge');
+  if (badge) badge.style.display = visible ? 'inline-flex' : 'none';
+}
 
-      // Fetch live activity
-      const actData = await PocAPI.fetchActivity(conn.url);
-      if (actData.items && actData.items.length > 0) {
-        const list = document.getElementById('activity-list');
-        if (list) {
-          list.innerHTML = '';
-          actData.items.slice(0, 10).forEach(item => {
-            const icons = { proof: '\u27C1', message: '\u2709', approval: '\u2713' };
-            const li = document.createElement('li');
-            li.className = 'activity-item';
-            const ago = Math.floor((Date.now()/1000 - item.timestamp));
-            const agoStr = ago < 60 ? 'Just now' : ago < 3600 ? Math.floor(ago/60) + 'm ago' : Math.floor(ago/3600) + 'h ago';
-            li.innerHTML = `<div class="activity-icon ${item.activity_type}">${icons[item.activity_type] || '\u2022'}</div>
-              <div class="activity-content"><div class="activity-title">${item.title}</div>
-              <div class="activity-meta">${item.description} &middot; ${agoStr}</div></div>`;
-            list.appendChild(li);
-          });
-        }
+function showLiveError(msg) {
+  var existing = document.getElementById('live-error-banner');
+  if (msg) {
+    if (!existing) {
+      var banner = document.createElement('div');
+      banner.id = 'live-error-banner';
+      banner.className = 'live-error-banner';
+      banner.innerHTML = '<span class="error-dot"></span><span>' + msg + '</span>';
+      var main = document.getElementById('main-content');
+      if (main && main.firstChild) {
+        main.insertBefore(banner, main.firstChild);
       }
-    } catch(e) {
-      console.warn('Live sync failed:', e);
+    } else {
+      existing.innerHTML = '<span class="error-dot"></span><span>' + msg + '</span>';
+      existing.style.display = 'flex';
+    }
+  } else if (existing) {
+    existing.style.display = 'none';
+  }
+}
+
+function startLivePolling() {
+  if (livePollingInterval) return; // already polling
+  var conn = PocAPI.getConnection();
+  if (!conn) return;
+
+  liveConnected = true;
+  liveConsecutiveErrors = 0;
+  showLiveBadge(true);
+  showLiveError(null);
+
+  function pollOnce() {
+    if (!liveConnected) return;
+    var c = PocAPI.getConnection();
+    if (!c) {
+      stopLivePolling();
+      fallbackToMock();
+      return;
+    }
+    var baseUrl = c.url;
+
+    // Fetch all three endpoints in parallel
+    Promise.all([
+      PocAPI.fetchStatus(baseUrl).catch(function(e) { return { _error: e }; }),
+      PocAPI.fetchActivity(baseUrl).catch(function(e) { return { _error: e }; }),
+      PocAPI.fetchProofs(baseUrl).catch(function(e) { return { _error: e }; })
+    ]).then(function(results) {
+      var statusData = results[0];
+      var activityData = results[1];
+      var proofsData = results[2];
+
+      // Check if all failed
+      var allFailed = statusData._error && activityData._error && proofsData._error;
+      if (allFailed) {
+        liveConsecutiveErrors++;
+        if (liveConsecutiveErrors >= 3) {
+          showLiveError('Connection lost. Falling back to cached data. Retrying...');
+          showLiveBadge(false);
+        }
+        return;
+      }
+
+      // At least one succeeded — reset error state
+      liveConsecutiveErrors = 0;
+      showLiveError(null);
+      showLiveBadge(true);
+
+      // --- Update from /api/status ---
+      if (statusData && !statusData._error) {
+        updateFromStatus(statusData);
+      }
+
+      // --- Update from /api/activity ---
+      if (activityData && !activityData._error) {
+        updateFromActivity(activityData);
+      }
+
+      // --- Update from /api/proofs ---
+      if (proofsData && !proofsData._error) {
+        updateFromProofs(proofsData);
+      }
+    });
+  }
+
+  // Immediate first poll, then every 3 seconds
+  pollOnce();
+  livePollingInterval = setInterval(pollOnce, 3000);
+}
+
+function stopLivePolling() {
+  if (livePollingInterval) {
+    clearInterval(livePollingInterval);
+    livePollingInterval = null;
+  }
+  liveConnected = false;
+  showLiveBadge(false);
+  showLiveError(null);
+}
+
+function fallbackToMock() {
+  // Re-render mock data for current agent
+  if (currentAgent) {
+    renderAgent();
+    var list = document.getElementById('activity-list');
+    if (list) list.innerHTML = '';
+    seedActivity();
+  }
+}
+
+function updateFromStatus(status) {
+  // Agent Status card
+  if (status.agent_id) {
+    document.getElementById('metric-agent-id').textContent = status.agent_id;
+    document.getElementById('agent-name').textContent = status.agent_id;
+  }
+  if (status.ens_name) {
+    document.getElementById('metric-ens').textContent = status.ens_name;
+    document.getElementById('agent-ens').textContent = status.ens_name;
+  }
+  if (status.network) {
+    document.getElementById('agent-type-badge').textContent = status.network;
+  }
+  if (status.policy_hash) {
+    document.getElementById('metric-policy-hash').textContent = status.policy_hash;
+    document.getElementById('policy-hash-short').textContent = status.policy_hash;
+  }
+
+  // Status indicator
+  var s = status.status || 'online';
+  var dotClass = s === 'online' ? '' : s === 'busy' ? 'busy' : 'offline';
+  var dotLabel = s === 'online' ? 'Online' : s === 'busy' ? 'Busy' : 'Offline';
+  document.getElementById('topbar-dot').className = 'status-dot' + (dotClass ? ' ' + dotClass : '');
+  document.getElementById('topbar-status-text').textContent = dotLabel;
+  document.getElementById('header-dot').className = 'status-dot' + (dotClass ? ' ' + dotClass : '');
+  document.getElementById('header-status-text').textContent = dotLabel;
+
+  // Uptime
+  if (typeof status.uptime_secs === 'number') {
+    var h = Math.floor(status.uptime_secs / 3600);
+    var m = Math.floor((status.uptime_secs % 3600) / 60);
+    var sec = status.uptime_secs % 60;
+    document.getElementById('uptime').textContent = h + 'h ' + m + 'm ' + sec + 's';
+    document.getElementById('metric-uptime').textContent = h + 'h ' + m + 'm';
+  }
+
+  // Execution stats
+  if (status.stats) {
+    var st = status.stats;
+    document.getElementById('stat-total').textContent = st.total_actions || 0;
+    document.getElementById('stat-autonomous').textContent = st.autonomous_actions || 0;
+    document.getElementById('stat-approved').textContent = st.approved_actions || 0;
+    document.getElementById('stat-violations').textContent = st.violations || 0;
+    document.getElementById('stat-proofs').textContent = st.proofs_generated || 0;
+    document.getElementById('stat-verified').textContent = st.proofs_verified || 0;
+  }
+}
+
+function updateFromActivity(actData) {
+  var items = actData.items || actData.activity || actData;
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  var list = document.getElementById('activity-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  var icons = { proof: '\u27C1', message: '\u2709', approval: '\u2713' };
+  var shown = items.slice(0, 12);
+  for (var i = 0; i < shown.length; i++) {
+    var item = shown[i];
+    var li = document.createElement('li');
+    li.className = 'activity-item';
+    var actType = item.activity_type || item.type || 'proof';
+    var icon = icons[actType] || '\u2022';
+    var title = item.title || item.action || 'Activity';
+    var desc = item.description || item.details || '';
+
+    // Time ago
+    var agoStr = '';
+    if (item.timestamp) {
+      var ago = Math.floor(Date.now() / 1000 - item.timestamp);
+      if (ago < 0) ago = 0;
+      if (ago < 60) agoStr = 'Just now';
+      else if (ago < 3600) agoStr = Math.floor(ago / 60) + 'm ago';
+      else agoStr = Math.floor(ago / 3600) + 'h ago';
+    } else if (item.time) {
+      agoStr = item.time;
+    }
+
+    li.innerHTML = '<div class="activity-icon ' + actType + '">' + icon + '</div>' +
+      '<div class="activity-content"><div class="activity-title">' + title + '</div>' +
+      '<div class="activity-meta">' + desc + (agoStr ? ' &middot; ' + agoStr : '') + '</div></div>';
+    list.appendChild(li);
+  }
+}
+
+function updateFromProofs(proofsData) {
+  var proofs = proofsData.proofs || proofsData.items || proofsData;
+  if (!Array.isArray(proofs)) return;
+
+  // Update proof count stats from proof data
+  var total = proofs.length;
+  var verified = 0;
+  for (var i = 0; i < proofs.length; i++) {
+    if (proofs[i].verified || proofs[i].on_chain || proofs[i].status === 'verified') {
+      verified++;
     }
   }
-  // First sync immediately, then every 5s
-  syncOnce();
-  setInterval(syncOnce, 5000);
+  document.getElementById('stat-proofs').textContent = total;
+  document.getElementById('stat-verified').textContent = verified;
+}
+
+// Legacy wrapper kept for compatibility
+function startLiveSync() {
+  if (isLiveAgent()) {
+    startLivePolling();
+  }
 }
 
 function loadAgents() {
@@ -1299,7 +1590,15 @@ function showEmptyState() {
 // BOOT
 // =====================================================
 init();
+
+// Sidebar collapse
+function toggleSidebar() {
+  document.body.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('poc-sidebar-collapsed', document.body.classList.contains('sidebar-collapsed'));
+}
+if (localStorage.getItem('poc-sidebar-collapsed') === 'true') {
+  document.body.classList.add('sidebar-collapsed');
+}
 </script>
-<script src="poc-api.js"></script>
 </body>
 </html>
