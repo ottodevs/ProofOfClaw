@@ -347,13 +347,23 @@ body.sidebar-collapsed .main-content { margin-left: 60px; }
         <div class="wizard-step-title">Agent Identity</div>
         <div class="wizard-step-subtitle">Define your agent's on-chain identity</div>
         <div class="form-group">
+          <label>Swarm (Team)</label>
+          <div style="display:flex;gap:8px;">
+            <select id="agent-swarm" style="flex:1;">
+              <option value="">Select a swarm...</option>
+            </select>
+            <button class="btn-wizard btn-wizard-next" style="padding:10px 16px;font-size:11px;white-space:nowrap;" onclick="showSwarmCreation()">+ New</button>
+          </div>
+          <div class="form-hint">Agents are registered under a swarm (team) within your organization</div>
+        </div>
+        <div class="form-group">
           <label>Agent Name</label>
           <input type="text" id="agent-name" placeholder="e.g. defi-optimizer">
         </div>
         <div class="form-group">
           <label>ENS Subdomain</label>
-          <input type="text" id="agent-ens" placeholder="e.g. my-agent.proofclaw.eth">
-          <div class="form-hint">Enter a full ENS name or it will auto-generate as name.proofclaw.eth</div>
+          <input type="text" id="agent-ens" placeholder="auto-generated" readonly style="color:var(--cyan);background:var(--bg-primary);">
+          <div class="form-hint" id="ens-hint">Name.Swarm.Org.eth — auto-generated from your selections above</div>
         </div>
         <div class="form-group">
           <label>Description</label>
@@ -558,6 +568,7 @@ function init() {
   renderTypeGrid();
   renderSkillTags();
   bindNameField();
+  refreshSwarmSelector();
   // Check URL param for mode
   const params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'deploy') setVaultMode('deploy');
@@ -673,7 +684,8 @@ function validateStep() {
 
   switch(stepNum) {
     case 1: valid = wizardData.type !== null; break;
-    case 2: valid = document.getElementById('agent-name').value.trim().length > 0; break;
+    case 2: valid = document.getElementById('agent-name').value.trim().length > 0
+                  && document.getElementById('agent-swarm').value.length > 0; break;
     case 5: valid = true; break;
   }
 
@@ -708,9 +720,9 @@ function gatherStepData() {
   switch(wizardStep) {
     case 2:
       wizardData.name = document.getElementById('agent-name').value.trim();
-      const ensField = document.getElementById('agent-ens').value.trim();
-      const parentDomain = localStorage.getItem('poc_ens_domain') || 'proofclaw.eth';
-      wizardData.ens = ensField || (wizardData.name.toLowerCase().replace(/[^a-z0-9-]/g, '') + '.' + parentDomain);
+      wizardData.swarmId = document.getElementById('agent-swarm').value;
+      const slug = toSlug(wizardData.name);
+      wizardData.ens = wizardData.swarmId ? buildAgentENS(slug, wizardData.swarmId) : document.getElementById('agent-ens').value.trim();
       wizardData.description = document.getElementById('agent-desc').value.trim();
       wizardData.network = document.getElementById('agent-network').value;
       break;
@@ -758,26 +770,57 @@ function selectType(typeId, el) {
   validateStep();
 }
 
+// ─── Swarm Selector ───
+
+function refreshSwarmSelector() {
+  const sel = document.getElementById('agent-swarm');
+  if (!sel) return;
+  const swarms = getSwarms();
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Select a swarm...</option>' +
+    swarms.map(s => `<option value="${esc(s.id)}">${esc(s.name)} — ${esc(s.ens)}</option>`).join('');
+  if (prev && swarms.some(s => s.id === prev)) sel.value = prev;
+  updateAgentENS();
+}
+
+function updateAgentENS() {
+  const nameEl = document.getElementById('agent-name');
+  const ensEl = document.getElementById('agent-ens');
+  const swarmSel = document.getElementById('agent-swarm');
+  if (!nameEl || !ensEl || !swarmSel) return;
+
+  const slug = toSlug(nameEl.value);
+  const swarmId = swarmSel.value;
+
+  if (slug && swarmId) {
+    ensEl.value = buildAgentENS(slug, swarmId);
+  } else if (slug) {
+    const org = getOrg();
+    ensEl.value = slug + (org ? '.<swarm>.' + org.slug + '.eth' : '.proofclaw.eth');
+  } else {
+    ensEl.value = '';
+  }
+}
+
 // ─── Name field -> ENS auto-gen ───
 
 function bindNameField() {
   const nameEl = document.getElementById('agent-name');
-  const ensEl = document.getElementById('agent-ens');
-  let ensManuallyEdited = false;
+  const swarmSel = document.getElementById('agent-swarm');
 
   nameEl.addEventListener('input', function() {
-    if (!ensManuallyEdited) {
-      const slug = this.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
-      const parentDomain = localStorage.getItem('poc_ens_domain') || 'proofclaw.eth';
-      ensEl.value = slug ? slug + '.' + parentDomain : '';
-    }
+    updateAgentENS();
     validateStep();
   });
 
-  ensEl.addEventListener('input', function() {
-    ensManuallyEdited = this.value.trim().length > 0;
-    validateStep();
-  });
+  if (swarmSel) {
+    swarmSel.addEventListener('change', function() {
+      updateAgentENS();
+      validateStep();
+    });
+  }
+
+  refreshSwarmSelector();
 }
 
 // ─── Skill Tags ───
@@ -889,6 +932,7 @@ function deployComplete() {
     id: agentId,
     name: wizardData.name,
     ens: wizardData.ens,
+    swarmId: wizardData.swarmId || null,
     type: wizardData.type,
     typeIcon: wizardData.typeIcon,
     network: wizardData.network,
@@ -912,6 +956,13 @@ function deployComplete() {
   try { agents = JSON.parse(localStorage.getItem('poc_agents')) || []; } catch(e) { agents = []; }
   agents.push(newAgent);
   localStorage.setItem('poc_agents', JSON.stringify(agents));
+
+  // Increment swarm agent count
+  if (wizardData.swarmId) {
+    const swarms = getSwarms();
+    const sw = swarms.find(s => s.id === wizardData.swarmId);
+    if (sw) { sw.agentCount = (sw.agentCount || 0) + 1; saveSwarms(swarms); }
+  }
 
   document.getElementById('success-message').textContent =
     `${newAgent.name} (${newAgent.ens}) registered. Start your agent to connect.`;
@@ -973,6 +1024,7 @@ function startRegister() {
     id: agentId,
     name: wizardData.name,
     ens: wizardData.ens,
+    swarmId: wizardData.swarmId || null,
     type: wizardData.type,
     typeIcon: wizardData.typeIcon,
     network: wizardData.network,
@@ -992,6 +1044,13 @@ function startRegister() {
   try { agents = JSON.parse(localStorage.getItem('poc_agents')) || []; } catch(e) { agents = []; }
   agents.push(newAgent);
   localStorage.setItem('poc_agents', JSON.stringify(agents));
+
+  // Increment swarm agent count
+  if (wizardData.swarmId) {
+    const swarms = getSwarms();
+    const sw = swarms.find(s => s.id === wizardData.swarmId);
+    if (sw) { sw.agentCount = (sw.agentCount || 0) + 1; saveSwarms(swarms); }
+  }
 
   document.getElementById('vault-title').textContent = 'Agent Registered!';
 
@@ -1040,6 +1099,7 @@ function resetVault() {
   // Reset form fields
   document.getElementById('agent-name').value = '';
   document.getElementById('agent-ens').value = '';
+  document.getElementById('agent-swarm').value = '';
   document.getElementById('agent-desc').value = '';
   document.getElementById('agent-network').value = 'sepolia';
   document.getElementById('custom-skill').value = '';

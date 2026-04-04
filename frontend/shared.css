@@ -710,6 +710,43 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   padding: 24px;
 }
 
+/* ── Organization Badge ── */
+.org-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.08), rgba(179, 136, 255, 0.08));
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 100px;
+  cursor: default;
+  transition: all 0.2s;
+}
+
+.org-badge:hover {
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.1);
+}
+
+.org-badge-icon {
+  font-size: 14px;
+  color: var(--cyan);
+}
+
+.org-badge-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.org-badge-ens {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--cyan);
+  opacity: 0.7;
+}
+
 /* ── Pulse Animation ── */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
