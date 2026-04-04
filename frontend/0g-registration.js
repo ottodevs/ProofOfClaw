@@ -21,9 +21,9 @@ const ZERO_G_CONFIG = {
     },
     // TODO: Update with deployed contract addresses
     contracts: {
-      agentRegistry: '0x0000000000000000000000000000000000000000',
-      iNFT: '0x0000000000000000000000000000000000000000',
-      policyEngine: '0x0000000000000000000000000000000000000000'
+      agentRegistry: '0xe34dab193105f3d7ec6ee4e6172cbe6213108d8b', // ProofOfClawVerifier
+      iNFT: '0x45c69b7be9dc9a4126053a17a43e664b4ae031a1', // ProofOfClawINFT
+      policyEngine: '0xe34dab193105f3d7ec6ee4e6172cbe6213108d8b'
     }
   },
   mainnet: {
