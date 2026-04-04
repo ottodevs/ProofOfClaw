@@ -1872,7 +1872,8 @@ const AGENT_TYPES = [
 ];
 
 function agentSvg(typeId) {
-  return AGENT_SVGS[typeId] || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const type = AGENT_TYPES.find(t => t.id === typeId);
+  return type ? type.icon : 'public/icons/coordinator.svg';
 }
 
 // Demo agent that connects to the running local API
@@ -1882,7 +1883,7 @@ const DEFAULT_AGENTS = [
     name: 'Proof Agent',
     ens: 'proof.proofclaw.eth',
     type: 'coordinator',
-    typeIcon: '\uD83C\uDF0F',
+    typeIcon: 'public/icons/coordinator.svg',
     network: 'og_testnet',
     skills: ['zk-proofs', 'smart-contracts', 'security-audit'],
     allowedTools: ['query', 'read', 'chat'],
@@ -2003,7 +2004,7 @@ function renderAgents() {
   grid.innerHTML = filtered.map(a => `
     <div class="agent-card" onclick="openChat('${a.id}')">
       <div class="agent-card-header">
-        <div class="agent-avatar">${agentSvg(a.type)}</div>
+        <div class="agent-avatar"><img src="${a.typeIcon || agentSvg(a.type)}" alt="" style="width:100%;height:100%;object-fit:contain;"></div>
         <div class="agent-info">
           <div class="agent-name">${esc(a.name)}</div>
           <div class="agent-ens">${esc(a.ens)}</div>
@@ -2115,7 +2116,7 @@ function openProfile(agentId) {
 
   document.getElementById('profile-body').innerHTML = `
     <div class="agent-profile-header">
-      <div class="profile-avatar">${agentSvg(a.type)}</div>
+      <div class="profile-avatar"><img src="${a.typeIcon || agentSvg(a.type)}" alt="" style="width:100%;height:100%;object-fit:contain;"></div>
       <div class="profile-info">
         <h3>${esc(a.name)}</h3>
         <div class="ens">${esc(a.ens)}</div>
@@ -2430,7 +2431,7 @@ function renderTypeGrid() {
   const grid = document.getElementById('type-grid');
   grid.innerHTML = AGENT_TYPES.map(t => `
     <div class="type-option" data-type="${t.id}" onclick="selectType('${t.id}', this)">
-      <span class="type-emoji">${agentSvg(t.id)}</span>
+      <span class="type-emoji"><img src="${t.icon}" alt="" style="width:100%;height:100%;object-fit:contain;"></span>
       <div>
         <div class="type-label">${t.name}</div>
         <div class="type-desc">${t.desc}</div>
@@ -2758,7 +2759,7 @@ function openChat(agentId) {
   chatAgentId = agentId;
 
   // Populate header
-  document.getElementById('chat-agent-avatar').innerHTML = agentSvg(a.type);
+  document.getElementById('chat-agent-avatar').innerHTML = `<img src="${a.typeIcon || agentSvg(a.type)}" alt="" style="width:100%;height:100%;object-fit:contain;">`;
   document.getElementById('chat-agent-name').textContent = a.name;
   document.getElementById('chat-agent-meta').textContent = a.ens + ' \u00B7 ' + a.type;
 
