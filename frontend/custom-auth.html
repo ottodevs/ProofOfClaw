@@ -323,8 +323,15 @@ const AGENT_ID = '61a7016a-b417-4f49-87f1-ade2ed1cf99b';
 const VAULT_ID = '358ff77c-4c0d-4d1a-85a1-b25bde541cd8';
 
 let oneClawToken = null;
+let isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 async function authenticateWithOneClaw() {
+  // Skip 1claw auth on localhost due to CORS
+  if (isLocalhost) {
+    console.log('1claw: Skipping auth on localhost (CORS restricted)');
+    return false;
+  }
+  
   try {
     const response = await fetch(`${ONECLAW_ENDPOINT}/auth/agent-token`, {
       method: 'POST',
@@ -339,7 +346,7 @@ async function authenticateWithOneClaw() {
     oneClawToken = data.access_token;
     return true;
   } catch (e) {
-    console.error('1claw auth failed:', e);
+    console.error('1claw auth failed:', e.message || e);
     return false;
   }
 }
@@ -375,12 +382,8 @@ async function saveSecret(name, value, type, service) {
   secrets[name] = { value, type, service, createdAt: Date.now() };
   localStorage.setItem('poc_custom_secrets', JSON.stringify(secrets));
   
-  // Try to sync to 1claw
-  if (!oneClawToken) {
-    await authenticateWithOneClaw();
-  }
-  
-  if (oneClawToken) {
+  // Try to sync to 1claw if connected (skip on localhost due to CORS)
+  if (!isLocalhost && oneClawToken) {
     try {
       await fetch(`${ONECLAW_ENDPOINT}/vaults/${VAULT_ID}/secrets`, {
         method: 'POST',
@@ -398,6 +401,8 @@ async function saveSecret(name, value, type, service) {
     } catch (e) {
       console.log('Failed to sync to 1claw, saved locally');
     }
+  } else if (isLocalhost) {
+    console.log('Saved locally (1claw CORS restricted on localhost)');
   }
   
   return true;
