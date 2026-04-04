@@ -37,8 +37,8 @@ const CONTRACT_ADDRESSES = {
     registry: '0x0000000000000000000000000000000000000000', // TODO: Deploy and update
   },
   og_testnet: {
-    inft: '0x0000000000000000000000000000000000000000',
-    registry: '0x0000000000000000000000000000000000000000',
+    inft: '0x45c69b7be9dc9a4126053a17a43e664b4ae031a1', // ProofOfClawINFT
+    registry: '0xe34dab193105f3d7ec6ee4e6172cbe6213108d8b', // ProofOfClawVerifier
   },
 };
 
