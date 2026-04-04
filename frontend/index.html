@@ -217,6 +217,26 @@ nav {
   pointer-events: none;
 }
 
+.hero-spline {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.hero-spline iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  opacity: 0.6;
+  filter: saturate(1.2);
+  pointer-events: none;
+}
+
 .hero-content {
   max-width: 900px;
   margin: 0 auto;
@@ -1422,9 +1442,6 @@ footer {
     <span class="nav-title">Proof of Claw</span>
   </a>
   <ul class="nav-links">
-    <li><a href="#features">Features</a></li>
-    <li><a href="#architecture">Architecture</a></li>
-    <li><a href="#demo">Live Demo</a></li>
     <li><a href="dashboard.html">Dashboard</a></li>
     <li><a href="agents.html">Agents</a></li>
   </ul>
@@ -1439,9 +1456,6 @@ footer {
 
 <!-- Mobile Menu -->
 <div class="mobile-menu">
-  <a href="#features" onclick="document.querySelector('.mobile-menu').classList.remove('active'); document.querySelector('.hamburger').classList.remove('active');">Features</a>
-  <a href="#architecture" onclick="document.querySelector('.mobile-menu').classList.remove('active'); document.querySelector('.hamburger').classList.remove('active');">Architecture</a>
-  <a href="#demo" onclick="document.querySelector('.mobile-menu').classList.remove('active'); document.querySelector('.hamburger').classList.remove('active');">Live Demo</a>
   <a href="dashboard.html">Dashboard</a>
   <a href="agents.html">Agents</a>
   <a href="deploy.html">Deploy Agent</a>
@@ -1450,6 +1464,9 @@ footer {
 <!-- ========== HERO ========== -->
 <section class="hero">
   <canvas id="hero-canvas"></canvas>
+  <div class="hero-spline">
+    <iframe src="https://my.spline.design/techinspired3dassetscloudupload-N18MKosxJziTm0QUErqJ1Hry/" loading="lazy" title="3D Hero"></iframe>
+  </div>
   <div class="hero-content">
     <div class="hero-problem">
       <span class="pulse-dot"></span>
