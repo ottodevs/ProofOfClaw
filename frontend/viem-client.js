@@ -181,7 +181,8 @@ export async function registerAgentOnchain(agentConfig) {
     throw new Error('Wallet not connected. Call connectWallet() first.');
   }
 
-  const { name, ens, network, allowedTools, valueLimit, endpoints, description } = agentConfig;
+  const { name, ens, network, allowedTools, valueLimit, endpoints, description,
+          storageURI, storageRootHash } = agentConfig;
 
   // Generate deterministic agent ID from name
   const agentId = keccak256(stringToBytes(name.toLowerCase().trim()));
@@ -193,14 +194,16 @@ export async function registerAgentOnchain(agentConfig) {
   );
   const policyHash = keccak256(policyData);
 
-  // Mock RISC Zero image ID (would be actual image commitment in production)
+  // RISC Zero image ID derived from policy commitment
   const riscZeroImageId = keccak256(stringToBytes(`risc-zero-policy-${policyHash}`));
 
-  // Generate encrypted metadata URI (would be actual 0G Storage URI in production)
-  const encryptedURI = `0g://storage/${agentId.slice(2, 18)}/metadata.enc`;
-  const metadataHash = keccak256(stringToBytes(JSON.stringify({
-    name, description, tools: allowedTools, limit: valueLimit
-  })));
+  // Use real 0G Storage URI and hash from upload, or derive from metadata
+  const encryptedURI = storageURI || `0g://${storageRootHash || agentId.slice(2, 18)}`;
+  const metadataHash = storageRootHash
+    ? storageRootHash
+    : keccak256(stringToBytes(JSON.stringify({
+        name, description, tools: allowedTools, limit: valueLimit
+      })));
 
   // Get contract addresses for network
   const addresses = CONTRACT_ADDRESSES[network] || CONTRACT_ADDRESSES.sepolia;

@@ -1,9 +1,12 @@
 /**
  * 0G Chain Agent Registration
  * Handles on-chain agent registration with 0G testnet/mainnet and DM3 integration
+ * Uses real 0G Storage SDK for decentralized data upload
  */
 
 import { configValidator, Networks } from './config-validator.js';
+import { Indexer as ZgIndexer } from 'https://esm.sh/@0glabs/0g-ts-sdk@0.3.3';
+import { BrowserProvider } from 'https://esm.sh/ethers@6.13.4';
 
 // 0G Chain Configuration
 const ZERO_G_CONFIG = {
@@ -13,8 +16,9 @@ const ZERO_G_CONFIG = {
     rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/scR1Fc9-4XIVgYevigWXy',
     explorer: 'https://sepolia.etherscan.io',
     storage: {
-      indexer: 'https://indexer-storage-testnet.0g.ai',
-      broker: 'https://broker-testnet.0g.ai'
+      indexer: 'https://indexer-storage-testnet-turbo.0g.ai',
+      evmRpc: 'https://evmrpc-testnet.0g.ai',
+      flowContract: '0x22E03a6A89B950F1c82ec5e74F8eCa321a105296'
     },
     compute: {
       endpoint: 'https://broker-testnet.0g.ai'
@@ -29,10 +33,11 @@ const ZERO_G_CONFIG = {
     chainId: 16602,
     name: '0G Testnet',
     rpcUrl: 'https://evmrpc-testnet.0g.ai',
-    explorer: 'https://chainscan-dev.0g.ai',
+    explorer: 'https://chainscan-galileo.0g.ai',
     storage: {
-      indexer: 'https://indexer-storage-testnet.0g.ai',
-      broker: 'https://broker-testnet.0g.ai'
+      indexer: 'https://indexer-storage-testnet-turbo.0g.ai',
+      evmRpc: 'https://evmrpc-testnet.0g.ai',
+      flowContract: '0x22E03a6A89B950F1c82ec5e74F8eCa321a105296'
     },
     compute: {
       endpoint: 'https://broker-testnet.0g.ai'
@@ -50,7 +55,8 @@ const ZERO_G_CONFIG = {
     explorer: 'https://chainscan.0g.ai',
     storage: {
       indexer: 'https://indexer-storage.0g.ai',
-      broker: 'https://broker.0g.ai'
+      evmRpc: 'https://evmrpc.0g.ai',
+      flowContract: '0x22E03a6A89B950F1c82ec5e74F8eCa321a105296'
     },
     compute: {
       endpoint: 'https://broker.0g.ai'
@@ -166,13 +172,13 @@ export class AgentRegistrationManager {
       const network = session.config.network.includes('mainnet') ? 'mainnet' : session.config.network.includes('sepolia') ? 'sepolia' : 'testnet';
       const config = ZERO_G_CONFIG[network];
 
-      // Prepare encrypted metadata
+      // Encrypt metadata with wallet-derived key
       const encryptedData = await this.encryptMetadata(metadata, session.config);
-      
+
       this.updateStatus(sessionId, 'uploading', { upload: 60 });
 
-      // Upload to 0G Storage
-      const uploadResult = await this.perform0GUpload(encryptedData, config.storage.indexer);
+      // Upload to 0G Storage (real decentralized upload)
+      const uploadResult = await this.perform0GUpload(encryptedData, config.storage);
       
       session.results.storage = {
         rootHash: uploadResult.rootHash,
@@ -357,9 +363,9 @@ export class AgentRegistrationManager {
 
       this.updateStatus(sessionId, 'uploading_soul', { upload: 25 });
 
-      // Encrypt and upload to 0G Storage
+      // Encrypt and upload to 0G Storage (real decentralized upload)
       const encryptedSoul = await this.encryptMetadata({ soulBackup: soulYaml }, session.config);
-      const uploadResult = await this.perform0GUpload(encryptedSoul, config.storage.indexer);
+      const uploadResult = await this.perform0GUpload(encryptedSoul, config.storage);
 
       session.results.soulBackup = {
         hash: soulBackupHash,
@@ -474,24 +480,82 @@ export class AgentRegistrationManager {
   // Internal helper methods
 
   async encryptMetadata(metadata, config) {
-    // In production, this would use actual encryption
-    // For now, return JSON stringified with sensitive fields masked
-    const sanitized = {
-      ...metadata,
-      privateKey: undefined,
-      secrets: '[REDACTED]'
-    };
-    return JSON.stringify(sanitized);
+    const sanitized = { ...metadata, privateKey: undefined, secrets: undefined };
+    const plaintext = new TextEncoder().encode(JSON.stringify(sanitized));
+
+    // Derive a symmetric key from the wallet address (owner can always decrypt)
+    const walletAddr = config.walletAddress || config.ensName || 'proof-of-claw';
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(walletAddr),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const aesKey = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    );
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plaintext);
+
+    // Pack salt + iv + ciphertext into a single buffer
+    const packed = new Uint8Array(salt.length + iv.length + new Uint8Array(ciphertext).length);
+    packed.set(salt, 0);
+    packed.set(iv, salt.length);
+    packed.set(new Uint8Array(ciphertext), salt.length + iv.length);
+
+    return packed;
   }
 
-  async perform0GUpload(data, indexerUrl) {
-    // Placeholder for actual 0G Storage upload
-    // In production, this would call the 0G Storage API
-    const mockRootHash = '0x' + Array(64).fill(0).map(() => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
-    
-    return { rootHash: mockRootHash, size: data.length };
+  /**
+   * Get an ethers signer from window.ethereum (needed for 0G SDK)
+   */
+  async getEthersSigner() {
+    if (!window.ethereum) throw new Error('No wallet detected');
+    const provider = new BrowserProvider(window.ethereum);
+    return await provider.getSigner();
+  }
+
+  /**
+   * Upload data to 0G Storage using the real SDK
+   * @param {Uint8Array|string} data - Data to upload
+   * @param {Object} storageConfig - { indexer, evmRpc, flowContract }
+   * @returns {{ rootHash: string, txHash: string, size: number }}
+   */
+  async perform0GUpload(data, storageConfig) {
+    const { indexer: indexerUrl, evmRpc } = storageConfig;
+
+    // Convert string data to bytes if needed
+    const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+
+    // Create a File/Blob for the SDK
+    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const file = new File([blob], 'upload.bin', { type: 'application/octet-stream' });
+
+    // Get ethers signer for 0G chain transactions
+    const signer = await this.getEthersSigner();
+
+    // Initialize 0G Storage indexer
+    const indexer = new ZgIndexer(indexerUrl);
+
+    // Upload to 0G Storage — submits on-chain tx to Flow contract + uploads segments
+    const [tx, err] = await indexer.upload(file, evmRpc, signer);
+
+    if (err) {
+      throw new Error(`0G Storage upload failed: ${err.message || err}`);
+    }
+
+    return {
+      rootHash: tx.rootHash || tx.txHash,
+      txHash: tx.txHash || tx.rootHash,
+      size: bytes.length
+    };
   }
 
   async executeRegistration(data, walletClient, publicClient, networkConfig) {
@@ -510,13 +574,16 @@ export class AgentRegistrationManager {
     // Get the actual wallet and public clients from the viem module
     // We need to call the registerAgentOnchain function through the viem client
     const agentConfig = {
-      name: data.agentId ? data.agentId.slice(2, 18) : 'agent', // Use part of agentId as name
+      name: data.agentId ? data.agentId.slice(2, 18) : 'agent',
       ens: data.ensName || '',
       network: networkConfig.name?.toLowerCase().includes('0g') ? 'og_testnet' : 'sepolia',
       allowedTools: data.skills || ['swap_tokens', 'transfer', 'query'],
       valueLimit: data.maxTasks || 100,
       endpoints: '',
-      description: ''
+      description: data.soulPersona || '',
+      // Pass real 0G Storage URIs from upload results
+      storageURI: data.encryptedURI || '',
+      storageRootHash: data.metadataHash || ''
     };
 
     // Call the actual on-chain registration via viem
