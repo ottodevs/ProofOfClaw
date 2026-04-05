@@ -7,6 +7,24 @@ import { configValidator, Networks } from './config-validator.js';
 
 // 0G Chain Configuration
 const ZERO_G_CONFIG = {
+  sepolia: {
+    chainId: 11155111,
+    name: 'Sepolia Testnet',
+    rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/scR1Fc9-4XIVgYevigWXy',
+    explorer: 'https://sepolia.etherscan.io',
+    storage: {
+      indexer: 'https://indexer-storage-testnet.0g.ai',
+      broker: 'https://broker-testnet.0g.ai'
+    },
+    compute: {
+      endpoint: 'https://broker-testnet.0g.ai'
+    },
+    contracts: {
+      agentRegistry: '0xe311a113684F5Fd2F983fD7dE59c0D4e6C630C10', // ProofOfClawVerifier (with soul backup)
+      iNFT: '0x6afF6B0fb940FFB20B7D8104A1C7c42b9d167f29', // ProofOfClawINFT (OCMB v0.1)
+      policyEngine: '0xe311a113684F5Fd2F983fD7dE59c0D4e6C630C10'
+    }
+  },
   testnet: {
     chainId: 16602,
     name: '0G Testnet',
@@ -19,10 +37,9 @@ const ZERO_G_CONFIG = {
     compute: {
       endpoint: 'https://broker-testnet.0g.ai'
     },
-    // TODO: Update with deployed contract addresses
     contracts: {
       agentRegistry: '0xe34dab193105f3d7ec6ee4e6172cbe6213108d8b', // ProofOfClawVerifier
-      iNFT: '0x45c69b7be9dc9a4126053a17a43e664b4ae031a1', // ProofOfClawINFT
+      iNFT: '0x45c69b7be9dc9a4126053a17a43e664b4ae031a1', // ProofOfClawINFT (old - no soul backup)
       policyEngine: '0xe34dab193105f3d7ec6ee4e6172cbe6213108d8b'
     }
   },
@@ -146,7 +163,7 @@ export class AgentRegistrationManager {
     this.updateStatus(sessionId, 'uploading', { upload: 30 });
 
     try {
-      const network = session.config.network.includes('mainnet') ? 'mainnet' : 'testnet';
+      const network = session.config.network.includes('mainnet') ? 'mainnet' : session.config.network.includes('sepolia') ? 'sepolia' : 'testnet';
       const config = ZERO_G_CONFIG[network];
 
       // Prepare encrypted metadata
@@ -183,7 +200,7 @@ export class AgentRegistrationManager {
 
     try {
       const { config, results } = session;
-      const network = config.network.includes('mainnet') ? 'mainnet' : 'testnet';
+      const network = config.network.includes('mainnet') ? 'mainnet' : config.network.includes('sepolia') ? 'sepolia' : 'testnet';
       const zeroGConfig = ZERO_G_CONFIG[network];
 
       // Generate agent ID
@@ -332,7 +349,7 @@ export class AgentRegistrationManager {
     this.updateStatus(sessionId, 'uploading_soul', { upload: 15 });
 
     try {
-      const network = session.config.network.includes('mainnet') ? 'mainnet' : 'testnet';
+      const network = session.config.network.includes('mainnet') ? 'mainnet' : session.config.network.includes('sepolia') ? 'sepolia' : 'testnet';
       const config = ZERO_G_CONFIG[network];
 
       // Hash the soul backup (SHA-256 client-side, keccak256 on-chain)
