@@ -23,6 +23,7 @@
     { id: 'kanban',       href: 'kanban.html',       icon: '▪',  label: 'Kanban'        },
     { id: 'soul-vault',   href: 'soul-vault.html',   icon: '⬡',  label: 'Soul Vault'    },
     { id: 'approve',      href: 'approve.html',      icon: '✔',  label: 'Approve'       },
+    { id: 'docs',          href: 'docs.html',          icon: '📄', label: 'Docs'          },
   ];
 
   const STORAGE_KEY = 'poc_nav_order';
