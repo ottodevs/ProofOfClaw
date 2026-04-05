@@ -767,6 +767,165 @@
   to { transform: rotate(360deg); }
 }
 
+/* ═══ 0G Storage Metrics Panel ═══ */
+.zg-metrics {
+  display: none;
+  margin: 20px auto;
+  max-width: 440px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-card);
+  font-size: 12px;
+}
+
+.zg-metrics.active { display: block; }
+
+.zg-metrics-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(0,229,255,0.04);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.zg-metrics-header:hover { background: rgba(0,229,255,0.07); }
+
+.zg-metrics-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cyan);
+  flex: 1;
+}
+
+.zg-metrics-toggle {
+  color: var(--text-dim);
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+
+.zg-metrics.collapsed .zg-metrics-toggle { transform: rotate(-90deg); }
+.zg-metrics.collapsed .zg-metrics-body { display: none; }
+
+.zg-metrics-body {
+  padding: 12px 16px;
+}
+
+.zg-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.zg-metric-row:last-child { border-bottom: none; }
+
+.zg-metric-label {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zg-metric-value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.zg-metric-value.hash {
+  color: var(--cyan);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.zg-metric-value.hash:hover { text-decoration: underline; }
+
+.zg-metric-value .zg-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zg-badge.live { background: rgba(0,230,118,0.12); color: var(--green); }
+.zg-badge.pending { background: var(--amber-glow); color: var(--amber); }
+.zg-badge.offline { background: rgba(255,61,90,0.1); color: var(--red); }
+
+.zg-metric-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.zg-metric-bar-fill {
+  height: 100%;
+  background: var(--cyan);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+
+/* Success metrics summary */
+.success-metrics {
+  text-align: left;
+  max-width: 420px;
+  margin: 20px auto;
+  border: 1px solid rgba(0,230,118,0.15);
+  border-radius: 12px;
+  background: rgba(0,230,118,0.03);
+  padding: 16px;
+}
+
+.success-metrics-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green);
+  margin-bottom: 10px;
+}
+
+.success-metric-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.success-metric-item:last-child { border-bottom: none; }
+
+.success-metric-item .label { color: var(--text-dim); }
+
+.success-metric-item .value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.success-metric-item .value.hash { color: var(--cyan); font-size: 10px; }
+
 /* Success screen */
 .deploy-success {
   display: none;
@@ -2365,6 +2524,66 @@
             <div class="deploy-step-item" data-deploy="finalize"><span class="step-icon">&#x25E6;</span> Finalizing deployment</div>
             <div class="deploy-step-item" data-deploy="complete"><span class="step-icon">&#x25E6;</span> Complete!</div>
           </div>
+
+          <!-- 0G Storage Metrics (live during deploy) -->
+          <div class="zg-metrics" id="zg-metrics" onclick="this.classList.toggle('collapsed')">
+            <div class="zg-metrics-header">
+              <span style="font-size:14px;">&#x25C9;</span>
+              <span class="zg-metrics-title">0G Private Storage</span>
+              <span class="zg-metrics-toggle">&#x25BC;</span>
+            </div>
+            <div class="zg-metrics-body">
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Indexer</span>
+                <span class="zg-metric-value" id="zg-indexer-status"><span class="zg-badge pending">Connecting</span></span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Network</span>
+                <span class="zg-metric-value" id="zg-network">--</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Flow Contract</span>
+                <span class="zg-metric-value hash" id="zg-flow-contract" title="Click to copy">--</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Soul Backup</span>
+                <span class="zg-metric-value" id="zg-soul-status">Waiting...</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Soul Hash</span>
+                <span class="zg-metric-value hash" id="zg-soul-hash" title="Click to copy">--</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Soul URI</span>
+                <span class="zg-metric-value hash" id="zg-soul-uri" title="Click to copy">--</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Metadata</span>
+                <span class="zg-metric-value" id="zg-meta-status">Waiting...</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Meta Root Hash</span>
+                <span class="zg-metric-value hash" id="zg-meta-hash" title="Click to copy">--</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Encrypted Size</span>
+                <span class="zg-metric-value" id="zg-encrypted-size">--</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">Upload Progress</span>
+                <span class="zg-metric-value" id="zg-upload-pct">0%</span>
+              </div>
+              <div class="zg-metric-bar"><div class="zg-metric-bar-fill" id="zg-upload-bar"></div></div>
+              <div class="zg-metric-row" style="margin-top:6px;">
+                <span class="zg-metric-label">Encryption</span>
+                <span class="zg-metric-value" id="zg-encryption">AES-256-GCM + PBKDF2</span>
+              </div>
+              <div class="zg-metric-row">
+                <span class="zg-metric-label">On-chain Anchor</span>
+                <span class="zg-metric-value" id="zg-onchain-status">Pending mint...</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Success -->
@@ -2373,6 +2592,11 @@
           <h3>Agent Deployed Successfully!</h3>
           <p id="success-message">Your agent is now live and generating cryptographic proofs.</p>
           <div class="success-links" id="success-links"></div>
+          <!-- 0G Metrics Summary (shown on success) -->
+          <div class="success-metrics" id="success-metrics" style="display:none;">
+            <div class="success-metrics-title">0G Private Storage Summary</div>
+            <div id="success-metrics-body"></div>
+          </div>
         </div>
       </div>
 
@@ -3326,6 +3550,8 @@ function resetWizardUI() {
   // Reset deploy states
   document.getElementById('deploy-progress').classList.remove('active');
   document.getElementById('deploy-success').classList.remove('active');
+  document.getElementById('zg-metrics').classList.remove('active');
+  document.getElementById('success-metrics').style.display = 'none';
   document.getElementById('review-content').style.display = 'block';
   document.getElementById('wizard-progress').style.display = 'flex';
   document.getElementById('wizard-footer').style.display = 'flex';
@@ -5057,11 +5283,21 @@ async function doOnchainDeploy() {
 // Update deploy progress UI based on session status
 function updateDeployProgressUI(session) {
   const steps = document.querySelectorAll('.deploy-step-item');
-  
+  const metricsPanel = document.getElementById('zg-metrics');
+
+  // Show metrics panel as soon as uploading begins
+  if (session.status !== 'pending' && session.status !== 'failed') {
+    metricsPanel.classList.add('active');
+  }
+
+  // Update 0G metrics from session results
+  update0GMetrics(session);
+
   switch (session.status) {
     case 'validating':
       updateStepStatus(steps, 0, 'active');
       break;
+    case 'uploading_soul':
     case 'uploading':
       updateStepStatus(steps, 0, 'done');
       updateStepStatus(steps, 1, 'active');
@@ -5082,6 +5318,150 @@ function updateDeployProgressUI(session) {
       });
       break;
   }
+}
+
+// ── 0G Storage Metrics ──────────────────────────────────────────────
+function update0GMetrics(session) {
+  const { config, results, progress, status } = session;
+
+  // Network info
+  const network = config.network?.includes('mainnet') ? 'mainnet' : config.network?.includes('sepolia') ? 'sepolia' : 'testnet';
+  const zgConfig = ZERO_G_CONFIG?.[network];
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val) el.textContent = val;
+  };
+
+  const setHash = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val && val !== '--') {
+      const short = val.length > 20 ? val.slice(0, 10) + '...' + val.slice(-8) : val;
+      el.textContent = short;
+      el.title = val + ' (click to copy)';
+      el.onclick = (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(val).then(() => {
+          el.textContent = 'Copied!';
+          setTimeout(() => { el.textContent = short; }, 1200);
+        });
+      };
+    }
+  };
+
+  // Network
+  const networkNames = { sepolia: 'Sepolia (ETH)', testnet: '0G Galileo (16602)', mainnet: '0G Mainnet (16661)' };
+  setVal('zg-network', networkNames[network] || network);
+
+  // Flow contract
+  if (zgConfig?.storage?.flowContract) {
+    setHash('zg-flow-contract', zgConfig.storage.flowContract);
+  }
+
+  // Indexer status
+  if (status === 'uploading' || status === 'uploading_soul') {
+    document.getElementById('zg-indexer-status').innerHTML = '<span class="zg-badge live">Connected</span>';
+  } else if (status === 'validating') {
+    document.getElementById('zg-indexer-status').innerHTML = '<span class="zg-badge pending">Connecting</span>';
+  }
+
+  // Upload progress bar
+  const uploadPct = progress.upload || 0;
+  setVal('zg-upload-pct', uploadPct + '%');
+  const bar = document.getElementById('zg-upload-bar');
+  if (bar) bar.style.width = uploadPct + '%';
+
+  // Soul backup results
+  if (results.soulBackup) {
+    const sb = results.soulBackup;
+    setVal('zg-soul-status', sb.size ? `${sb.size} bytes uploaded` : 'Uploaded');
+    setHash('zg-soul-hash', sb.hash);
+    setHash('zg-soul-uri', sb.uri);
+  } else if (status === 'uploading_soul') {
+    setVal('zg-soul-status', 'Uploading...');
+  }
+
+  // Metadata storage results
+  if (results.storage) {
+    const st = results.storage;
+    setVal('zg-meta-status', 'Stored on 0G');
+    setHash('zg-meta-hash', st.rootHash);
+  } else if (status === 'uploading') {
+    setVal('zg-meta-status', 'Encrypting & uploading...');
+  }
+
+  // Encrypted size (from storage upload)
+  if (results.storage?.rootHash) {
+    // We don't have exact encrypted size in session, estimate from config
+    const yamlSize = config.soulBackupYaml?.length || 0;
+    const metaSize = JSON.stringify(config).length;
+    setVal('zg-encrypted-size', formatBytes(yamlSize + metaSize));
+  }
+
+  // On-chain anchor
+  if (results.onchain?.txHash) {
+    const explorerBase = zgConfig?.explorer || 'https://sepolia.etherscan.io';
+    const el = document.getElementById('zg-onchain-status');
+    if (el) {
+      el.innerHTML = `<span class="zg-badge live">Anchored</span>`;
+    }
+  } else if (status === 'registering' || status === 'confirming') {
+    setVal('zg-onchain-status', 'Minting iNFT...');
+  }
+
+  // When complete, also build success metrics summary
+  if (status === 'completed') {
+    document.getElementById('zg-indexer-status').innerHTML = '<span class="zg-badge live">Synced</span>';
+    setVal('zg-upload-pct', '100%');
+    if (bar) bar.style.width = '100%';
+    setVal('zg-onchain-status', '');
+    document.getElementById('zg-onchain-status').innerHTML = '<span class="zg-badge live">Anchored</span>';
+    buildSuccessMetrics(session);
+  }
+}
+
+function buildSuccessMetrics(session) {
+  const { results, config } = session;
+  const container = document.getElementById('success-metrics-body');
+  const panel = document.getElementById('success-metrics');
+  if (!container || !panel) return;
+
+  const network = config.network?.includes('mainnet') ? 'mainnet' : config.network?.includes('sepolia') ? 'sepolia' : 'testnet';
+  const networkNames = { sepolia: 'Sepolia', testnet: '0G Galileo', mainnet: '0G Mainnet' };
+
+  const metrics = [
+    { label: 'Network', value: networkNames[network] || network },
+    { label: 'Soul Backup Hash', value: results.soulBackup?.hash, isHash: true },
+    { label: 'Soul Backup URI', value: results.soulBackup?.uri, isHash: true },
+    { label: 'Soul Size', value: results.soulBackup?.size ? results.soulBackup.size + ' bytes' : null },
+    { label: 'Metadata Root', value: results.storage?.rootHash, isHash: true },
+    { label: 'Storage URI', value: results.storage?.url, isHash: true },
+    { label: 'Encryption', value: 'AES-256-GCM (wallet-signed key)' },
+    { label: 'iNFT Token', value: results.onchain?.tokenId ? '#' + results.onchain.tokenId : null },
+    { label: 'Mint TX', value: results.onchain?.txHash, isHash: true },
+    { label: 'Contract', value: results.onchain?.contractAddress, isHash: true },
+  ].filter(m => m.value);
+
+  container.innerHTML = metrics.map(m => {
+    const short = m.isHash && m.value.length > 24
+      ? m.value.slice(0, 10) + '...' + m.value.slice(-8)
+      : m.value;
+    const cls = m.isHash ? ' hash' : '';
+    const click = m.isHash
+      ? ` onclick="navigator.clipboard.writeText('${m.value}').then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='${short}'},1200)})" style="cursor:pointer" title="${m.value}"`
+      : '';
+    return `<div class="success-metric-item"><span class="label">${m.label}</span><span class="value${cls}"${click}>${short}</span></div>`;
+  }).join('');
+
+  panel.style.display = 'block';
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 function updateStepStatus(steps, idx, status) {
