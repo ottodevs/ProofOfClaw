@@ -926,107 +926,31 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
 <script src="shared.js"></script>
 <script src="poc-api.js"></script>
 <script>
-// =====================================================
-// DEFAULT MOCK AGENTS (same as agents page)
-// =====================================================
-const DEFAULT_AGENTS = [
-  {
-    id: 'alpha-sentinel',
-    name: 'alpha-sentinel',
-    type: 'coordinator',
-    icon: 'public/icons/coordinator.svg',
-    status: 'online',
-    ens: 'alpha.proofclaw.eth',
-    endpoints: 'http://localhost:4443',
-    policyHash: '0x9f3a...c4e1',
-    desc: 'Primary fleet coordinator for multi-agent orchestration',
-    skills: ['multi-agent','delegation','task-routing','typescript'],
-    spendLimit: 500,
-    tasks: 156,
-    trust: 72,
-    uptime: '99.2%'
-  },
-  {
-    id: 'defi-scout',
-    name: 'defi-scout',
-    type: 'defi-strategist',
-    icon: 'public/icons/defi-strategist.svg',
-    status: 'online',
-    ens: 'defi-scout.proofclaw.eth',
-    endpoints: 'http://localhost:4443',
-    policyHash: '0x7b2e...a8d3',
-    desc: 'DeFi market scanner and yield optimizer',
-    skills: ['defi-protocols','uniswap','aave','data-analysis'],
-    spendLimit: 100,
-    tasks: 89,
-    trust: 65,
-    uptime: '97.8%'
-  },
-  {
-    id: 'sec-auditor',
-    name: 'sec-auditor',
-    type: 'security-auditor',
-    icon: 'public/icons/security-auditor.svg',
-    status: 'busy',
-    ens: 'sec-auditor.proofclaw.eth',
-    endpoints: 'http://localhost:4443',
-    policyHash: '0x3d71...f5b9',
-    desc: 'Smart contract security auditor',
-    skills: ['solidity','security-audit','smart-contracts','slither'],
-    spendLimit: 50,
-    tasks: 42,
-    trust: 58,
-    uptime: '95.4%'
-  },
-  {
-    id: 'gov-delegate',
-    name: 'gov-delegate',
-    type: 'governance-agent',
-    icon: 'public/icons/governance-agent.svg',
-    status: 'online',
-    ens: 'gov-delegate.proofclaw.eth',
-    endpoints: 'http://localhost:4443',
-    policyHash: '0xa4f8...2c67',
-    desc: 'DAO governance participation agent',
-    skills: ['governance','dao-voting','proposals','snapshot'],
-    spendLimit: 100,
-    tasks: 31,
-    trust: 54,
-    uptime: '98.1%'
-  },
-  {
-    id: 'yield-hunter',
-    name: 'yield-hunter',
-    type: 'defi-strategist',
-    icon: 'public/icons/defi-strategist.svg',
-    status: 'offline',
-    ens: 'yield-hunter.proofclaw.eth',
-    endpoints: 'http://localhost:4443',
-    policyHash: '0x61c3...9ae4',
-    desc: 'Cross-chain yield farming specialist',
-    skills: ['yield-farming','liquidity','cross-chain','bridges'],
-    spendLimit: 200,
-    tasks: 67,
-    trust: 48,
-    uptime: '88.3%'
-  },
-  {
-    id: 'data-oracle',
-    name: 'data-oracle',
-    type: 'data-analyst',
-    icon: 'public/icons/data-analyst.svg',
-    status: 'online',
-    ens: 'data-oracle.proofclaw.eth',
-    endpoints: 'http://localhost:4443',
-    policyHash: '0x2e89...b7f0',
-    desc: 'On-chain data aggregation and analytics',
-    skills: ['data-analysis','chainlink','the-graph','sql'],
-    spendLimit: 50,
-    tasks: 203,
-    trust: 69,
-    uptime: '99.6%'
-  }
-];
+// No default mock agents — dashboard shows only real registered agents.
+// Use agents.html to create and register agents with your org.
+const DEFAULT_AGENTS = [];
+
+// One-time migration: purge stale mock alpha-sentinel data that may have been
+// saved to localStorage from a previous version of this page.
+(function purgeMockAgents() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('poc_agents'));
+    if (Array.isArray(stored)) {
+      // Known mock agent IDs from the previous DEFAULT_AGENTS list
+      const MOCK_IDS = ['alpha-sentinel','defi-scout','sec-auditor','gov-delegate','yield-hunter','data-oracle'];
+      const real = stored.filter(a => !MOCK_IDS.includes(a.id));
+      if (real.length !== stored.length) {
+        // Some mocks were present — purge them
+        if (real.length > 0) {
+          localStorage.setItem('poc_agents', JSON.stringify(real));
+        } else {
+          localStorage.removeItem('poc_agents');
+        }
+      }
+    }
+  } catch (_) {}
+})();
+
 
 // =====================================================
 // STATE
@@ -1423,10 +1347,10 @@ function loadAgents() {
     }
   } catch (e) {}
 
-  // Use defaults
-  agents = DEFAULT_AGENTS;
-  localStorage.setItem('poc_agents', JSON.stringify(agents));
-  if (typeof PocPersist !== 'undefined') PocPersist.savePref('poc_agents', agents);
+  // No real agents found — stay empty, show the empty state
+  agents = [];
+  // Do NOT write DEFAULT_AGENTS to localStorage.
+  // Real agents are added via poc-api.js syncLiveAgent() when you connect.
 }
 
 function populateSelector() {
@@ -1779,12 +1703,36 @@ function updateBalance(weiStr) {
 // SHOW EMPTY STATE
 // =====================================================
 function showEmptyState() {
-  document.getElementById('main-content').innerHTML =
-    '<div class="empty-state">' +
-      '<div class="icon">\u27C1</div>' +
-      '<p>No agents found. Deploy an agent first.</p>' +
-      '<a href="agents.html" class="btn btn-primary" style="margin-top: 1rem;">Go to Agents</a>' +
-    '</div>';
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  main.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;gap:1.5rem;padding:2rem;">
+      <div style="font-size:3rem;opacity:0.3;">⟁</div>
+      <div>
+        <h2 style="font-family:var(--font-display,Syne,sans-serif);font-size:1.4rem;font-weight:700;color:var(--text-primary,#e8ecf4);margin:0 0 0.5rem;">No agents connected</h2>
+        <p style="color:var(--text-secondary,#8892a4);font-size:0.9rem;line-height:1.6;max-width:420px;margin:0 auto;">
+          The dashboard shows live data from your registered agents.<br>
+          Connect a running agent to see its status, activity, and proofs here.
+        </p>
+      </div>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;">
+        <button
+          onclick="typeof PocAPI !== 'undefined' && PocAPI.showConnectModal()"
+          style="padding:10px 22px;background:var(--cyan,#00e5ff);color:#06080d;border:none;border-radius:8px;font-family:var(--font-mono,'JetBrains Mono',monospace);font-weight:700;font-size:13px;cursor:pointer;letter-spacing:0.04em;transition:all 0.2s;"
+          onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+          ⚡ Connect Live Agent
+        </button>
+        <a href="agents.html"
+          style="padding:10px 22px;background:transparent;color:var(--text-secondary,#8892a4);border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-family:var(--font-mono,'JetBrains Mono',monospace);font-size:13px;cursor:pointer;text-decoration:none;transition:all 0.2s;"
+          onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='var(--text-primary,#e8ecf4)'"
+          onmouseout="this.style.borderColor='rgba(255,255,255,0.08)';this.style.color='var(--text-secondary,#8892a4)'">
+          Manage Agents →
+        </a>
+      </div>
+      <p style="color:var(--text-dim,#4a5568);font-size:0.75rem;font-family:var(--font-mono,'JetBrains Mono',monospace);">
+        Start your agent: <code style="color:var(--cyan,#00e5ff);background:rgba(0,229,255,0.06);padding:2px 6px;border-radius:3px;">cargo run -- --port 8420</code>
+      </p>
+    </div>`;
 }
 
 // =====================================================
