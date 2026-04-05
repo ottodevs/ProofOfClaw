@@ -42,7 +42,13 @@
       "Bash(chmod +x /home/god/ProofOfClaw/ProofOfClaw/delivery-service/setup.sh)",
       "Bash(curl -s 'https://esm.sh/viem@2.21.44/es2022/_esm/constants/contracts.mjs')",
       "Bash(curl -s 'https://esm.sh/viem@2.21.44/_esm/accounts/privateKeyToAccount.js')",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(grep -E \"\\\\.\\(html|js|css\\)$\")",
+      "Read(//home/god/ProofOfClaw/ProofOfClaw/**)",
+      "Bash(grep -l \"abi\\\\|ProofOfClaw\\\\|verifier\" /home/god/ProofOfClaw/ProofOfClaw/frontend/*.js)",
+      "Bash(grep -r \"proofs\\\\.html\\\\|proofs\\\\|Proofs\" /home/god/ProofOfClaw/ProofOfClaw/frontend/*.html)",
+      "Bash(ls /home/god/ProofOfClaw/ProofOfClaw/.env*)",
+      "Bash(node -c sanitize.js)"
     ]
   }
 }

@@ -412,8 +412,8 @@ export async function switchNetwork(network) {
   if (!window.ethereum) throw new Error('No wallet detected');
 
   const chainId = network === 'sepolia' ? '0xaa36a7' // 11155111
-    : network === 'og_testnet' ? '0x40d2' // 16602
-    : network === 'og_mainnet' ? '0x410d' // 16661
+    : network === 'og_testnet' ? '0x40da' // 16602
+    : network === 'og_mainnet' ? '0x4115' // 16661
     : '0x1'; // mainnet
 
   try {
@@ -425,13 +425,13 @@ export async function switchNetwork(network) {
     // If network not added, add it
     if (switchError.code === 4902) {
       const chainConfig = network === 'og_testnet' ? {
-        chainId: '0x40d2',
+        chainId: '0x40da',
         chainName: '0G Testnet',
         nativeCurrency: { name: '0G', symbol: 'OG', decimals: 18 },
         rpcUrls: ['https://evmrpc-testnet.0g.ai'],
         blockExplorerUrls: ['https://chainscan-dev.0g.ai'],
       } : network === 'og_mainnet' ? {
-        chainId: '0x410d',
+        chainId: '0x4115',
         chainName: '0G Mainnet',
         nativeCurrency: { name: '0G', symbol: 'OG', decimals: 18 },
         rpcUrls: ['https://evmrpc.0g.ai'],

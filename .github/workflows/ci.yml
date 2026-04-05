@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Solidity / Foundry ──────────────────────────────────────────────
+  contracts:
+    name: Contracts (Foundry)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Cache Foundry build
+        uses: actions/cache@v4
+        with:
+          path: |
+            contracts/out
+            contracts/cache
+          key: foundry-${{ hashFiles('contracts/foundry.toml', 'contracts/src/**/*.sol') }}
+          restore-keys: foundry-
+
+      - name: Build
+        run: forge build
+
+      - name: Test
+        run: forge test -vvv
+
+  # ── Rust / proof_of_claw ────────────────────────────────────────────
+  rust:
+    name: Rust (proof_of_claw)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache Cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            proof_of_claw/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('proof_of_claw/Cargo.toml', 'proof_of_claw/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Check
+        working-directory: proof_of_claw
+        run: cargo check
+
+      - name: Test
+        working-directory: proof_of_claw
+        run: cargo test
+
+  # ── Frontend / Node.js ──────────────────────────────────────────────
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate JS syntax
+        run: |
+          echo "Checking frontend JS files for syntax errors..."
+          find frontend -name '*.js' -not -path '*/node_modules/*' -not -path '*/pkg/*' \
+            -exec node --check {} +
+
+      - name: Build env config
+        run: node scripts/build-env.js

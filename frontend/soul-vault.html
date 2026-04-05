@@ -676,6 +676,77 @@ function getStepNumber() { return getSteps()[wizardStep - 1]; }
 function isLastStep() { return wizardStep >= getTotalSteps(); }
 
 // ═══════════════════════════════════════
+// WIZARD SAVE / RESUME (localStorage)
+// ═══════════════════════════════════════
+
+const WIZARD_STORAGE_KEY = 'poc_wizard_state';
+
+function saveWizardState() {
+  try {
+    // Gather current form values into wizardData before saving
+    gatherStepData();
+    const state = { step: wizardStep, mode: vaultMode, data: wizardData };
+    localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(state));
+  } catch (_) { /* quota exceeded — silently skip */ }
+}
+
+function restoreWizardState() {
+  try {
+    const raw = localStorage.getItem(WIZARD_STORAGE_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    if (!saved || !saved.step || !saved.data) return false;
+
+    // Restore mode first (rebuilds progress dots)
+    if (saved.mode && saved.mode !== vaultMode) setVaultMode(saved.mode);
+
+    // Restore data
+    Object.assign(wizardData, saved.data);
+    wizardStep = saved.step;
+
+    // Restore form field values from wizardData
+    if (wizardData.type) {
+      setTimeout(() => {
+        const typeEl = document.querySelector(`.type-option[data-type="${wizardData.type}"]`);
+        if (typeEl) { typeEl.classList.add('selected'); }
+      }, 0);
+    }
+    if (wizardData.name) { const el = document.getElementById('agent-name'); if (el) el.value = wizardData.name; }
+    if (wizardData.ens) { const el = document.getElementById('agent-ens'); if (el) el.value = wizardData.ens; }
+    if (wizardData.description) { const el = document.getElementById('agent-desc'); if (el) el.value = wizardData.description; }
+    if (wizardData.network) { const el = document.getElementById('agent-network'); if (el) el.value = wizardData.network; }
+    if (wizardData.soulPersona) { const el = document.getElementById('soul-persona'); if (el) el.value = wizardData.soulPersona; }
+    if (wizardData.valueLimit !== undefined) { const el = document.getElementById('value-limit'); if (el) el.value = wizardData.valueLimit; }
+    if (wizardData.endpoints) { const el = document.getElementById('endpoints'); if (el) el.value = wizardData.endpoints; }
+    if (wizardData.maxTasks) { const el = document.getElementById('max-tasks'); if (el) el.value = wizardData.maxTasks; }
+
+    // Restore checkbox-based tools
+    if (wizardData.tools) {
+      Object.entries(wizardData.tools).forEach(([key, val]) => {
+        const map = { llmContext: 'tool-llm-context', slack: 'tool-slack', telegram: 'tool-telegram', webSearch: 'tool-web-search' };
+        const el = document.getElementById(map[key]); if (el) el.checked = !!val;
+      });
+    }
+
+    // Restore skill selections
+    if (wizardData.skills && wizardData.skills.length) {
+      setTimeout(() => {
+        wizardData.skills.forEach(sk => {
+          const tag = document.querySelector(`.skill-tag[data-skill="${sk}"]`);
+          if (tag) tag.classList.add('selected');
+        });
+      }, 0);
+    }
+
+    return true;
+  } catch (_) { return false; }
+}
+
+function clearWizardState() {
+  localStorage.removeItem(WIZARD_STORAGE_KEY);
+}
+
+// ═══════════════════════════════════════
 // INITIALIZATION
 // ═══════════════════════════════════════
 
@@ -684,14 +755,20 @@ function init() {
   renderSkillTags();
   bindNameField();
   bindValidationEvents();
-  
+
   // Check URL param for mode
   const params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'deploy') setVaultMode('deploy');
-  
+
   // Default to 0G Testnet
   document.getElementById('agent-network').value = 'og_testnet';
-  
+
+  // Restore saved wizard state if available
+  const resumed = restoreWizardState();
+  if (resumed && wizardStep > 1) {
+    console.log('[Soul Vault] Resumed wizard at step', wizardStep);
+  }
+
   updateWizardUI();
 }
 
@@ -961,12 +1038,14 @@ function wizardNext() {
 
   wizardStep++;
   updateWizardUI();
+  saveWizardState();
 }
 
 function wizardBack() {
   if (wizardStep > 1) {
     wizardStep--;
     updateWizardUI();
+    saveWizardState();
   }
 }
 
@@ -1164,6 +1243,7 @@ function startDeploy() {
 }
 
 function deployComplete() {
+  clearWizardState();
   document.getElementById('deploy-progress').classList.remove('active');
   document.getElementById('deploy-success').classList.add('active');
   document.getElementById('vault-title').textContent = 'Agent Deployed!';
@@ -1460,8 +1540,9 @@ function completeRegistration(result, config) {
   // Update UI
   const successEl = document.getElementById('deploy-success');
   successEl.querySelector('.success-icon').innerHTML = '&#x2705;';
+  clearWizardState();
   successEl.querySelector('h3').textContent = 'Identity Registered on 0G Chain!';
-  document.getElementById('success-message').textContent = 
+  document.getElementById('success-message').textContent =
     `${newAgent.name} is now registered with on-chain identity.`;
 
   // Build explorer link
@@ -1540,6 +1621,7 @@ function retryRegistration() {
 
 
 function resetVault() {
+  clearWizardState();
   wizardStep = 1;
   wizardData = { type: null, skills: [], allowedTools: ['swap_tokens', 'transfer', 'query'] };
 

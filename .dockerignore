@@ -1,0 +1,42 @@
+# Dependencies (re-installed inside container)
+node_modules
+*/node_modules
+
+# Git
+.git
+.gitignore
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment (secrets — use docker-compose env vars instead)
+.env
+.env.local
+
+# Build artifacts
+proof_output.json
+*.log
+
+# Rust / ZK build artifacts
+target/
+proof_of_claw/target/
+zkvm/target/
+
+# Documentation (not needed at runtime)
+*.md
+!README.md
+
+# CI/CD
+.github
+.claude
+.gitnexus
+
+# Contracts (not needed for Docker services)
+contracts/
+
+# Test scripts
+test_*.sh
+test-*.mjs

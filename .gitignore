@@ -29,6 +29,7 @@ Thumbs.db
 
 # Build artifacts
 frontend/env-config.js
+frontend/env.generated.js
 
 # Logs
 *.log

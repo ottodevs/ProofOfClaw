@@ -452,6 +452,192 @@
   font-size: 0.85rem;
 }
 
+.empty-state .empty-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.empty-state .empty-actions a {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--border-cyan);
+  border-radius: 6px;
+  color: var(--cyan);
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.empty-state .empty-actions a:hover {
+  background: rgba(0, 229, 255, 0.08);
+}
+
+/* Search input */
+.search-input {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 0.5rem 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+  min-width: 200px;
+}
+
+.search-input:focus {
+  border-color: var(--cyan);
+}
+
+.search-input::placeholder {
+  color: var(--text-dim);
+}
+
+/* Refresh / auto-refresh */
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.7rem;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+  border-color: var(--border-cyan);
+  color: var(--cyan);
+}
+
+.refresh-btn.spinning .refresh-icon {
+  animation: spin 0.8s linear infinite;
+}
+
+.auto-refresh-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-refresh-toggle input {
+  accent-color: var(--cyan);
+}
+
+/* Copy button */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  margin-left: 4px;
+  transition: all 0.2s;
+  vertical-align: middle;
+}
+
+.copy-btn:hover {
+  border-color: var(--border-cyan);
+  color: var(--cyan);
+}
+
+.copy-btn.copied {
+  color: var(--green);
+  border-color: rgba(0, 230, 118, 0.3);
+}
+
+/* Skeleton loading */
+.skeleton-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+}
+
+.skeleton-line {
+  height: 14px;
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, rgba(255,255,255,0.04) 50%, var(--bg-secondary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.skeleton-line.w40 { width: 40%; }
+.skeleton-line.w60 { width: 60%; }
+.skeleton-line.w80 { width: 80%; }
+.skeleton-line.w100 { width: 100%; }
+.skeleton-line.h8 { height: 8px; }
+.skeleton-line.h20 { height: 20px; }
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Live indicator */
+.live-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-live 2s ease-in-out infinite;
+}
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.4); }
+  50% { opacity: 0.6; box-shadow: 0 0 8px rgba(0, 230, 118, 0.3); }
+}
+
+/* ZK badge */
+.zk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 100px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.zk-badge.zk-verified {
+  background: rgba(0, 230, 118, 0.08);
+  color: var(--green);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+}
+
+.zk-badge.zk-unverified {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
 /* Responsive */
 @media (max-width: 1100px) {
   .stats-bar { grid-template-columns: repeat(2, 1fr); }
@@ -533,10 +719,16 @@
         <span style="width:6px;height:6px;background:var(--green);border-radius:50%;"></span>
       </div>
       <div class="topbar-stats">
-        <span>Total: <span class="stat-val" id="statTotalInline">3</span></span>
-        <span>Verified: <span class="stat-val" style="color:var(--green)" id="statVerifiedInline">66%</span></span>
+        <span>Total: <span class="stat-val" id="statTotalInline">0</span></span>
+        <span>Verified: <span class="stat-val" style="color:var(--green)" id="statVerifiedInline">0%</span></span>
       </div>
-
+      <button class="refresh-btn" id="refreshBtn" onclick="refreshData()" title="Refresh data">
+        <span class="refresh-icon">&#x21BB;</span> Refresh
+      </button>
+      <label class="auto-refresh-toggle" title="Auto-refresh every 30s">
+        <input type="checkbox" id="autoRefreshToggle"> Auto
+      </label>
+      <span class="live-dot" id="liveDot" style="display:none;" title="Live updates active"></span>
     </div>
   </header>
 
@@ -547,24 +739,25 @@
     <div class="stats-bar">
       <div class="stat-card">
         <div class="stat-label">Total Proofs</div>
-        <div class="stat-value cyan" id="statTotal">3</div>
+        <div class="stat-value cyan" id="statTotal">--</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Verified On-Chain</div>
-        <div class="stat-value green" id="statVerified">2</div>
+        <div class="stat-value green" id="statVerified">--</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Pending</div>
-        <div class="stat-value amber" id="statPending">1</div>
+        <div class="stat-value amber" id="statPending">--</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Avg Proof Time</div>
-        <div class="stat-value" id="statAvgTime">40s</div>
+        <div class="stat-value" id="statAvgTime">--</div>
       </div>
     </div>
 
     <!-- FILTER BAR -->
     <div class="filter-bar">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search tx hash, address, method..." aria-label="Search proofs">
       <div class="filter-group">
         <label>Agent</label>
         <select id="filterAgent" aria-label="Filter proofs by agent">
@@ -589,6 +782,18 @@
           <option value="query">query</option>
         </select>
       </div>
+      <div class="filter-group">
+        <label>Sort</label>
+        <select id="sortBy" aria-label="Sort proofs">
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="block-desc">Block &#x2193;</option>
+          <option value="block-asc">Block &#x2191;</option>
+          <option value="value-desc">Value &#x2193;</option>
+          <option value="value-asc">Value &#x2191;</option>
+          <option value="status">Status</option>
+        </select>
+      </div>
       <a href="dashboard.html" id="backToDashboard" style="margin-left:auto;color:var(--cyan);font-size:0.75rem;text-decoration:none;display:none;">
         &larr; Back to Dashboard
       </a>
@@ -604,6 +809,7 @@
 <script src="wallet.js"></script>
 <script src="nav.js"></script>
 <script src="shared.js"></script>
+<script src="zkverifier.js"></script>
 <script>
 // ===================== 0G TESTNET EXPLORER API =====================
 const EXPLORER_API = 'https://chainscan-dev.0g.ai/api';
@@ -665,9 +871,10 @@ async function fetchWalletTransactions() {
 }
 
 // ===================== DATA =====================
-// Will be populated from on-chain data
 let proofs = [];
 let expandedProofs = new Set();
+let autoRefreshInterval = null;
+let searchDebounceTimer = null;
 
 // ===================== HELPERS =====================
 function getAgents() {
@@ -682,15 +889,100 @@ function getUrlParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
 
-function formatJson(obj) {
-  const lines = JSON.stringify(obj, null, 2).split('\n');
-  return lines.map(line => {
-    return line
-      .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
-      .replace(/: "([^"]*)"/g, ': <span class="json-string">"$1"</span>')
-      .replace(/: (\d+)/g, ': <span class="json-number">$1</span>')
-      .replace(/: (true|false)/g, ': <span class="json-boolean">$1</span>');
-  }).join('\n');
+function copyToClipboard(text, btnEl) {
+  navigator.clipboard.writeText(text).then(() => {
+    btnEl.classList.add('copied');
+    btnEl.textContent = '\u2713';
+    setTimeout(() => {
+      btnEl.classList.remove('copied');
+      btnEl.textContent = '\u2398';
+    }, 1500);
+  });
+}
+
+// ===================== SKELETON LOADING =====================
+function showSkeletonLoading() {
+  const container = document.getElementById('proofsContainer');
+  const cards = Array.from({ length: 3 }, () => `
+    <div class="skeleton-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">
+        <div class="skeleton-line h20 w40" style="margin:0;"></div>
+        <div class="skeleton-line h20" style="margin:0;width:120px;border-radius:100px;"></div>
+      </div>
+      <div class="skeleton-grid">
+        <div><div class="skeleton-line h8 w60"></div><div class="skeleton-line w80"></div></div>
+        <div><div class="skeleton-line h8 w60"></div><div class="skeleton-line w80"></div></div>
+        <div><div class="skeleton-line h8 w60"></div><div class="skeleton-line w80"></div></div>
+        <div><div class="skeleton-line h8 w60"></div><div class="skeleton-line w80"></div></div>
+        <div><div class="skeleton-line h8 w60"></div><div class="skeleton-line w80"></div></div>
+        <div><div class="skeleton-line h8 w60"></div><div class="skeleton-line w80"></div></div>
+      </div>
+    </div>`).join('');
+  container.innerHTML = cards;
+}
+
+// ===================== SEARCH & SORT =====================
+function getSearchQuery() {
+  return (document.getElementById('searchInput').value || '').toLowerCase().trim();
+}
+
+function matchesSearch(proof, query) {
+  if (!query) return true;
+  const fields = [
+    proof.txHash, proof.id, proof.from, proof.to,
+    proof.method, proof.status, proof.action, proof.blockNumber
+  ];
+  return fields.some(f => f && String(f).toLowerCase().includes(query));
+}
+
+function sortProofs(list) {
+  const sortBy = document.getElementById('sortBy').value;
+  const sorted = [...list];
+  switch (sortBy) {
+    case 'newest':
+      sorted.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      break;
+    case 'oldest':
+      sorted.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+      break;
+    case 'block-desc':
+      sorted.sort((a, b) => (parseInt(b.blockNumber) || 0) - (parseInt(a.blockNumber) || 0));
+      break;
+    case 'block-asc':
+      sorted.sort((a, b) => (parseInt(a.blockNumber) || 0) - (parseInt(b.blockNumber) || 0));
+      break;
+    case 'value-desc':
+      sorted.sort((a, b) => (parseFloat(b.value) || 0) - (parseFloat(a.value) || 0));
+      break;
+    case 'value-asc':
+      sorted.sort((a, b) => (parseFloat(a.value) || 0) - (parseFloat(b.value) || 0));
+      break;
+    case 'status':
+      const order = { verified: 0, pending: 1, failed: 2 };
+      sorted.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+      break;
+  }
+  return sorted;
+}
+
+// ===================== ZK VERIFICATION =====================
+async function tryZkVerify(proof) {
+  if (!window.zkVerify || !proof.journalB64 || !proof.sealB64) return null;
+  try {
+    return await window.zkVerify(proof.journalB64, proof.sealB64, proof.imageId || '');
+  } catch (e) {
+    console.warn('ZK verify failed for', proof.id, e);
+    return false;
+  }
+}
+
+function renderZkBadge(proof) {
+  if (proof.zkVerified === true) {
+    return '<span class="zk-badge zk-verified">ZK Verified</span>';
+  } else if (proof.zkVerified === false) {
+    return '<span class="zk-badge zk-unverified">ZK Unverified</span>';
+  }
+  return '';
 }
 
 // ===================== RENDER =====================
@@ -698,23 +990,37 @@ function renderProofs() {
   const agentFilter = document.getElementById('filterAgent').value;
   const statusFilter = document.getElementById('filterStatus').value;
   const actionFilter = document.getElementById('filterAction').value;
+  const searchQuery = getSearchQuery();
 
   let filtered = proofs.filter(p => {
     if (agentFilter !== 'all' && p.agent !== agentFilter) return false;
     if (statusFilter !== 'all' && p.status !== statusFilter) return false;
     if (actionFilter !== 'all' && p.action !== actionFilter) return false;
+    if (!matchesSearch(p, searchQuery)) return false;
     return true;
   });
+
+  filtered = sortProofs(filtered);
 
   const container = document.getElementById('proofsContainer');
 
   if (filtered.length === 0) {
+    const hasFilters = agentFilter !== 'all' || statusFilter !== 'all' || actionFilter !== 'all' || searchQuery;
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">&#x2713;</div>
-        <p>No proofs match the current filters.</p>
-        <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">Connect wallet to load on-chain data</p>
+        <div class="empty-icon">${hasFilters ? '&#x1F50D;' : '&#x2731;'}</div>
+        <p>${hasFilters ? 'No proofs match your filters.' : 'No proofs recorded yet.'}</p>
+        <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">
+          ${hasFilters
+            ? 'Try adjusting your search or filter criteria.'
+            : 'Connect your wallet to load on-chain transactions, or deploy an agent to start generating proofs.'}
+        </p>
+        <div class="empty-actions">
+          ${hasFilters ? '<a href="#" onclick="clearFilters();return false;">Clear Filters</a>' : ''}
+          ${!hasFilters ? '<a href="soul-vault.html">Deploy Agent</a><a href="dashboard.html">Go to Dashboard</a>' : ''}
+        </div>
       </div>`;
+    updateStats(filtered);
     return;
   }
 
@@ -724,12 +1030,14 @@ function renderProofs() {
     const statusLabel = proof.status === 'verified' ? '\u2713 Verified On-Chain'
                       : proof.status === 'pending' ? '\u23F3 Pending'
                       : '\u2717 Failed';
-    
-    // For on-chain tx data
+
     const isContractCreation = !proof.to || proof.to === '0x';
     const methodDisplay = isContractCreation ? 'Contract Creation' : (proof.method || 'Contract Call');
     const valueDisplay = proof.value ? `${proof.value} OG` : '0 OG';
-    
+    const zkBadge = renderZkBadge(proof);
+
+    const copyBtn = (text) => `<button class="copy-btn" onclick="copyToClipboard('${esc(text)}', this)" title="Copy">\u2398</button>`;
+
     let expandableHTML = '';
     if (proof.txHash) {
       expandableHTML = `
@@ -737,7 +1045,10 @@ function renderProofs() {
           <div class="chain-details">
             <div class="detail-item">
               <div class="detail-label">Transaction Hash</div>
-              <div class="hash-value"><a href="https://chainscan-dev.0g.ai/tx/${esc(proof.txHash)}" target="_blank" style="color:var(--cyan);text-decoration:none;">${esc(proof.txHash)} &#x2197;</a></div>
+              <div class="hash-value">
+                <a href="https://chainscan-dev.0g.ai/tx/${esc(proof.txHash)}" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:none;">${esc(proof.txHash)} &#x2197;</a>
+                ${copyBtn(proof.txHash)}
+              </div>
             </div>
             <div class="detail-item">
               <div class="detail-label">Block Number</div>
@@ -745,11 +1056,11 @@ function renderProofs() {
             </div>
             <div class="detail-item">
               <div class="detail-label">From</div>
-              <div class="detail-value">${esc(proof.from ? proof.from.slice(0, 16) + '...' : 'Unknown')}</div>
+              <div class="detail-value">${esc(proof.from || 'Unknown')}${proof.from ? copyBtn(proof.from) : ''}</div>
             </div>
             <div class="detail-item">
               <div class="detail-label">To</div>
-              <div class="detail-value">${esc(isContractCreation ? 'Contract Creation' : (proof.to ? proof.to.slice(0, 16) + '...' : 'Unknown'))}</div>
+              <div class="detail-value">${esc(isContractCreation ? 'Contract Creation' : (proof.to || 'Unknown'))}${proof.to && !isContractCreation ? copyBtn(proof.to) : ''}</div>
             </div>
             <div class="detail-item">
               <div class="detail-label">Value</div>
@@ -772,7 +1083,10 @@ function renderProofs() {
       <div class="proof-card" role="listitem" data-proof-id="${esc(proof.id)}" data-agent="${esc(proof.agent || 'unknown')}" data-status="${esc(proof.status)}" data-action="${esc(proof.action || 'unknown')}">
         <div class="proof-header">
           <div class="proof-id">${isContractCreation ? 'Contract Deployment' : 'Transaction'} #${esc(proof.id)}</div>
-          <div class="proof-status ${esc(statusClass)}">${statusLabel}</div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            ${zkBadge}
+            <div class="proof-status ${esc(statusClass)}">${statusLabel}</div>
+          </div>
         </div>
         <div class="proof-details-grid">
           <div class="detail-item">
@@ -834,7 +1148,7 @@ function toggleExpand(proofId) {
     el.classList.remove('expanded');
     btn.classList.remove('open');
     btn.setAttribute('aria-expanded', 'false');
-    btn.innerHTML = '<span class="arrow">\u25BC</span> Show Details';
+    btn.innerHTML = '<span class="arrow">\u25BC</span> Show On-Chain Data';
   } else {
     expandedProofs.add(proofId);
     el.classList.add('expanded');
@@ -842,6 +1156,16 @@ function toggleExpand(proofId) {
     btn.setAttribute('aria-expanded', 'true');
     btn.innerHTML = '<span class="arrow">\u25BC</span> Hide Details';
   }
+}
+
+function clearFilters() {
+  document.getElementById('filterAgent').value = 'all';
+  document.getElementById('agentFilter').value = '';
+  document.getElementById('filterStatus').value = 'all';
+  document.getElementById('filterAction').value = 'all';
+  document.getElementById('searchInput').value = '';
+  document.getElementById('sortBy').value = 'newest';
+  renderProofs();
 }
 
 // ===================== POPULATE FILTERS =====================
@@ -853,10 +1177,10 @@ function populateAgentFilters() {
     if (name) agentNames.add(name);
   });
 
-  const selects = [document.getElementById('filterAgent'), document.getElementById('topAgentFilter')];
+  const selects = [document.getElementById('filterAgent'), document.getElementById('agentFilter')];
   selects.forEach(sel => {
+    if (!sel) return;
     const current = sel.value;
-    // keep the "All" option
     while (sel.options.length > 1) sel.remove(1);
     agentNames.forEach(name => {
       const opt = document.createElement('option');
@@ -872,8 +1196,9 @@ function populateAgentFilters() {
 function applyUrlParams() {
   const agentParam = getUrlParam('agent');
   if (agentParam) {
-    ['filterAgent', 'topAgentFilter'].forEach(id => {
+    ['filterAgent', 'agentFilter'].forEach(id => {
       const sel = document.getElementById(id);
+      if (!sel) return;
       for (let i = 0; i < sel.options.length; i++) {
         if (sel.options[i].value === agentParam) {
           sel.value = agentParam;
@@ -881,7 +1206,6 @@ function applyUrlParams() {
         }
       }
     });
-    // Show back-to-dashboard link
     const backLink = document.getElementById('backToDashboard');
     backLink.style.display = 'inline';
     backLink.href = 'dashboard.html?agent=' + encodeURIComponent(agentParam);
@@ -890,26 +1214,76 @@ function applyUrlParams() {
 
 // ===================== EVENTS =====================
 document.getElementById('filterAgent').addEventListener('change', function() {
-  document.getElementById('topAgentFilter').value = this.value;
+  const topSel = document.getElementById('agentFilter');
+  if (topSel) topSel.value = this.value;
   renderProofs();
 });
-document.getElementById('topAgentFilter').addEventListener('change', function() {
+document.getElementById('agentFilter').addEventListener('change', function() {
   document.getElementById('filterAgent').value = this.value;
   renderProofs();
 });
 document.getElementById('filterStatus').addEventListener('change', renderProofs);
 document.getElementById('filterAction').addEventListener('change', renderProofs);
+document.getElementById('sortBy').addEventListener('change', renderProofs);
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(renderProofs, 200);
+});
+
+// ===================== REFRESH & AUTO-REFRESH =====================
+async function refreshData() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  await loadOnChainData();
+  btn.classList.remove('spinning');
+  btn.disabled = false;
+}
+
+document.getElementById('autoRefreshToggle').addEventListener('change', function() {
+  if (this.checked) {
+    autoRefreshInterval = setInterval(refreshData, 30000);
+  } else {
+    clearInterval(autoRefreshInterval);
+    autoRefreshInterval = null;
+  }
+});
+
+// ===================== WEBSOCKET LIVE UPDATES =====================
+function initWebSocket() {
+  if (typeof PocApi === 'undefined' || !PocApi.onWsEvent) return;
+  PocApi.onWsEvent('proofs', function(data) {
+    if (!data) return;
+    // Merge incoming proof into the list
+    const existing = proofs.findIndex(p => p.id === data.proof_id);
+    if (existing >= 0) {
+      proofs[existing] = { ...proofs[existing], ...data, id: data.proof_id };
+    } else {
+      proofs.unshift({
+        id: data.proof_id,
+        status: data.status || 'pending',
+        timestamp: data.timestamp || new Date().toISOString(),
+        agent: data.agent_id || 'unknown',
+        action: data.action || 'unknown',
+        ...data
+      });
+    }
+    renderProofs();
+    // Flash the live dot
+    const dot = document.getElementById('liveDot');
+    dot.style.display = 'inline-block';
+    clearTimeout(dot._hideTimer);
+    dot._hideTimer = setTimeout(() => { dot.style.display = 'none'; }, 5000);
+  });
+}
 
 // ===================== LOAD ON-CHAIN DATA =====================
 async function loadOnChainData() {
   const container = document.getElementById('proofsContainer');
-  container.innerHTML = `
-    <div class="empty-state">
-      <div class="empty-icon">&#x23F3;</div>
-      <p>Loading on-chain data from 0G Testnet...</p>
-      <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">Fetching transactions from explorer</p>
-    </div>`;
-  
+  if (proofs.length === 0) {
+    showSkeletonLoading();
+  }
+
   try {
     const txs = await fetchWalletTransactions();
     if (txs.length > 0) {
@@ -918,15 +1292,25 @@ async function loadOnChainData() {
         agent: 'deployed-agent',
         action: tx.method || 'contract_call'
       }));
+      // Attempt ZK verification on each proof
+      for (const proof of proofs) {
+        const result = await tryZkVerify(proof);
+        if (result !== null) proof.zkVerified = result;
+      }
       populateAgentFilters();
       renderProofs();
     } else {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">&#x26A0;</div>
-          <p>No transactions found</p>
-          <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">Could not fetch data from 0G Testnet explorer</p>
+          <p>No transactions found on 0G Testnet</p>
+          <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">Connect your wallet or check that the explorer API is reachable.</p>
+          <div class="empty-actions">
+            <a href="#" onclick="refreshData();return false;">Retry</a>
+            <a href="soul-vault.html">Deploy Agent</a>
+          </div>
         </div>`;
+      updateStats([]);
     }
   } catch (error) {
     console.error('Failed to load on-chain data:', error);
@@ -935,14 +1319,19 @@ async function loadOnChainData() {
         <div class="empty-icon">&#x2717;</div>
         <p>Failed to load on-chain data</p>
         <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">${esc(error.message)}</p>
+        <div class="empty-actions">
+          <a href="#" onclick="refreshData();return false;">Retry</a>
+        </div>
       </div>`;
+    updateStats([]);
   }
 }
 
 // ===================== INIT =====================
 populateAgentFilters();
 applyUrlParams();
-loadOnChainData(); // Fetch real data instead of using mock data
+loadOnChainData();
+initWebSocket();
 </script>
 <script src="poc-api.js"></script>
 </body>
