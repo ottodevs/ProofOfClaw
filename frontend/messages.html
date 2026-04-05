@@ -784,7 +784,7 @@ body.sidebar-collapsed .main-area { margin-left: var(--sidebar-w-collapsed); }
     </div>
     <div class="topbar-badges">
       <span class="badge badge-encrypted">&#x1F512; E2E Encrypted</span>
-
+      <span id="agent-status-badge" class="badge" style="display:none;"></span>
     </div>
   </header>
 
@@ -841,6 +841,8 @@ body.sidebar-collapsed .main-area { margin-left: var(--sidebar-w-collapsed); }
 
 <script src="shared.js"></script>
 <script src="poc-api.js"></script>
+<script src="wallet.js"></script>
+<script src="nav.js"></script>
 <script>
 (function() {
   // ── State ──
@@ -911,6 +913,26 @@ body.sidebar-collapsed .main-area { margin-left: var(--sidebar-w-collapsed); }
     return params.get('agent') || null;
   }
 
+  // ── Update topbar agent status badge ──
+  function updateAgentStatusBadge() {
+    const badge = document.getElementById('agent-status-badge');
+    if (!badge) return;
+    if (isLive()) {
+      const conn = PocAPI.getConnection();
+      badge.style.display = '';
+      badge.style.background = 'rgba(0,230,118,0.1)';
+      badge.style.border = '1px solid rgba(0,230,118,0.3)';
+      badge.style.color = 'var(--green)';
+      badge.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);display:inline-block;margin-right:5px;animation:pulse-dot 2s ease-in-out infinite;"></span>LIVE &mdash; ' + esc(conn.agentId || 'agent');
+    } else {
+      badge.style.display = '';
+      badge.style.background = 'rgba(74,85,104,0.15)';
+      badge.style.border = '1px solid rgba(74,85,104,0.3)';
+      badge.style.color = 'var(--text-dim)';
+      badge.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:var(--text-dim);display:inline-block;margin-right:5px;"></span>Offline';
+    }
+  }
+
   // ── Initialize ──
   function init() {
     const agents = loadAgents();
@@ -937,10 +959,13 @@ body.sidebar-collapsed .main-area { margin-left: var(--sidebar-w-collapsed); }
         const found = agents.find(a => a.ensName === urlAgent || a.name === urlAgent);
         currentAgent = found ? found.ensName : agents[0].ensName;
       } else {
-        currentAgent = agents[0].ensName;
+        currentAgent = agents[0] ? agents[0].ensName : null;
       }
     }
-    agentSelector.value = currentAgent;
+    if (currentAgent) agentSelector.value = currentAgent;
+
+    // Update topbar status badge
+    updateAgentStatusBadge();
 
     // Show live mode banner if connected
     if (isLive()) {
@@ -1004,7 +1029,8 @@ body.sidebar-collapsed .main-area { margin-left: var(--sidebar-w-collapsed); }
       .map(a => ({
         ensName: a.ensName,
         name: a.name,
-        online: a.status === 'active',
+        // 'active', 'online', or live flag all indicate reachable state
+        online: a.status === 'active' || a.status === 'online' || a.live === true,
         lastMessage: '',
         lastTime: ''
       }));

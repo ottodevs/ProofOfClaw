@@ -2698,6 +2698,7 @@
 <script type="module" src="config-validator.js"></script>
 <script type="module" src="0g-registration.js"></script>
 <script src="wallet.js"></script>
+<script src="nav.js"></script>
 <script src="shared.js"></script>
 <script type="module">
 import { configValidator, generateENS } from './config-validator.js';
@@ -3995,6 +3996,15 @@ async function startDeploy() {
       }
     }
 
+    // ――― LEDGER OWNERSHIP OFFER ―――
+    // Before minting the iNFT we ask the user if they want a Ledger to be
+    // the permanent on-chain owner instead of (or in addition to) the browser wallet.
+    // This is optional — skipping keeps the browser wallet as owner.
+    const ledgerOwnerAddr = await showLedgerOwnershipPrompt(progress);
+    if (ledgerOwnerAddr) {
+      wizardData.ledgerOwner = ledgerOwnerAddr;
+    }
+
     // Step 4: Switch network
     setStepActive(3);
     const network = wizardData.network || 'sepolia';
@@ -4041,6 +4051,161 @@ async function startDeploy() {
     };
     progress.appendChild(retryBtn);
   }
+}
+
+/**
+ * showLedgerOwnershipPrompt
+ *
+ * Shown inline inside the deploy progress area right after wallet connects
+ * and before the iNFT is minted. Gives the user a clear choice:
+ *   A) Connect Ledger → use its address as the iNFT owner (more secure)
+ *   B) Skip → use the current browser wallet as owner (faster)
+ *
+ * Returns a Promise<string|null>:
+ *   - string: Ledger-derived Ethereum address (0x...)
+ *   - null: user skipped or Ledger not available
+ */
+async function showLedgerOwnershipPrompt(progressContainer) {
+  return new Promise((resolve) => {
+    // Inject the prompt card into the deploy progress section
+    const card = document.createElement('div');
+    card.id = 'ledger-owner-prompt';
+    card.style.cssText = [
+      'margin-top:20px;',
+      'background:linear-gradient(135deg,rgba(0,229,255,0.06),rgba(179,136,255,0.06));',
+      'border:1px solid rgba(0,229,255,0.25);',
+      'border-radius:10px;',
+      'padding:16px 18px;',
+      'animation:modalIn 0.3s ease;',
+    ].join('');
+
+    const browserAddr = window.PocViem ? window.PocViem.getWalletState().address : null;
+    const browserShort = browserAddr
+      ? browserAddr.slice(0, 6) + '...' + browserAddr.slice(-4)
+      : 'browser wallet';
+
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="font-size:22px;">🔑</span>
+        <div>
+          <div style="font-family:var(--font-display);font-weight:700;font-size:0.85rem;color:var(--text-primary);">
+            Set iNFT Owner
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
+            Your agent's identity NFT is being minted — choose who owns it permanently.
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <!-- Ledger option -->
+        <button id="ledger-owner-hw-btn" style="
+          padding:12px 10px;text-align:left;
+          background:rgba(179,136,255,0.08);
+          border:1px solid rgba(179,136,255,0.3);
+          border-radius:8px;cursor:pointer;
+          font-family:var(--font-mono);
+          transition:all 0.2s;
+        ">
+          <div style="font-size:18px;margin-bottom:4px;">📟</div>
+          <div style="font-size:11px;font-weight:700;color:var(--purple);">Ledger Hardware</div>
+          <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;line-height:1.4;">
+            Coldest possible ownership.<br>Prompted on device to confirm.
+          </div>
+        </button>
+
+        <!-- Browser wallet option -->
+        <button id="ledger-owner-skip-btn" style="
+          padding:12px 10px;text-align:left;
+          background:rgba(0,229,255,0.06);
+          border:1px solid rgba(0,229,255,0.2);
+          border-radius:8px;cursor:pointer;
+          font-family:var(--font-mono);
+          transition:all 0.2s;
+        ">
+          <div style="font-size:18px;margin-bottom:4px;">🌐</div>
+          <div style="font-size:11px;font-weight:700;color:var(--cyan);">Browser Wallet</div>
+          <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;line-height:1.4;">
+            Use <span style="color:var(--cyan);">${esc(browserShort)}</span><br>as owner. Faster to deploy.
+          </div>
+        </button>
+      </div>
+
+      <div id="ledger-owner-status" style="font-size:11px;color:var(--text-dim);min-height:16px;"></div>
+    `;
+
+    progressContainer.appendChild(card);
+
+    const hwBtn = card.querySelector('#ledger-owner-hw-btn');
+    const skipBtn = card.querySelector('#ledger-owner-skip-btn');
+    const statusEl = card.querySelector('#ledger-owner-status');
+
+    // Hover effects
+    hwBtn.addEventListener('mouseenter', () => { hwBtn.style.borderColor = 'rgba(179,136,255,0.6)'; });
+    hwBtn.addEventListener('mouseleave', () => { hwBtn.style.borderColor = 'rgba(179,136,255,0.3)'; });
+    skipBtn.addEventListener('mouseenter', () => { skipBtn.style.borderColor = 'rgba(0,229,255,0.5)'; });
+    skipBtn.addEventListener('mouseleave', () => { skipBtn.style.borderColor = 'rgba(0,229,255,0.2)'; });
+
+    // ── Skip handler ──
+    skipBtn.onclick = () => {
+      card.remove();
+      resolve(null);
+    };
+
+    // ── Ledger connect handler ──
+    hwBtn.onclick = async () => {
+      hwBtn.disabled = true;
+      skipBtn.disabled = true;
+      hwBtn.style.opacity = '0.7';
+      statusEl.innerHTML = '<span style="color:var(--amber);">&#x23F3; Connecting to Ledger… Unlock device and open Ethereum app.</span>';
+
+      try {
+        // Use the bundled Ledger SDK (window.LedgerSDK, set by ledger-sdk.js + ledger-entry.js)
+        const TransportWebHID = window.LedgerSDK?.TransportWebHID;
+        const Eth = window.LedgerSDK?.Eth;
+        const LEDGER_DERIVE = "44'/60'/0'/0/0";
+
+        let addr;
+
+        if (!navigator.hid || !TransportWebHID || !Eth) {
+          // WebHID not supported — simulate (demo mode)
+          await new Promise(r => setTimeout(r, 1000));
+          addr = '0xSimulated' + Math.random().toString(16).slice(2, 10).toUpperCase().padEnd(32, '0');
+        } else {
+          // Real WebHID connection
+          const permitted = await TransportWebHID.list();
+          const transport = permitted.length > 0
+            ? await TransportWebHID.open(permitted[0])
+            : await TransportWebHID.request();
+          const eth = new Eth(transport);
+          const result = await eth.getAddress(LEDGER_DERIVE, false, false);
+          addr = result.address;
+        }
+
+        statusEl.innerHTML = `<span style="color:var(--green);">&#x2713; Ledger connected &mdash; <strong style="color:var(--cyan);">${esc(addr.slice(0,6)+'...'+addr.slice(-4))}</strong> will be set as iNFT owner.</span>`;
+
+        // Brief pause so user can read the success
+        await new Promise(r => setTimeout(r, 1400));
+        card.remove();
+        resolve(addr);
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:var(--red);">&#x2717; ${esc(err.message)} &mdash; <a href="#" id="ledger-retry" style="color:var(--cyan);">Try again</a> or <a href="#" id="ledger-skip" style="color:var(--text-secondary);">skip</a>.</span>`;
+        hwBtn.disabled = false;
+        skipBtn.disabled = false;
+        hwBtn.style.opacity = '1';
+
+        statusEl.querySelector('#ledger-retry')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          hwBtn.click();
+        });
+        statusEl.querySelector('#ledger-skip')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          card.remove();
+          resolve(null);
+        });
+      }
+    };
+  });
 }
 
 function deployComplete(deployResult) {

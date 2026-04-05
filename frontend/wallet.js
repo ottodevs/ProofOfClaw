@@ -26,7 +26,8 @@ async function connectWalletUI() {
     updateWalletUI(address);
     // Store connection in localStorage for cross-page persistence
     localStorage.setItem('poc_wallet_connected', 'true');
-    // Set wallet for Neon DB sync and pull user data from server
+    localStorage.setItem('poc_wallet_address', address);
+    // Sync to Neon DB if PocPersist is available
     if (typeof PocPersist !== 'undefined') {
       PocPersist.setWallet(address);
       PocPersist.fullSync().catch(() => {});
@@ -52,8 +53,15 @@ function updateWalletUI(address) {
 
   if (btn) btn.style.display = 'none';
   if (display) display.style.display = 'flex';
-  if (addressEl && window.PocViem) {
-    addressEl.textContent = window.PocViem.formatAddress(address);
+  if (addressEl) {
+    const formatted = (window.PocViem && window.PocViem.formatAddress)
+      ? window.PocViem.formatAddress(address)
+      : address.slice(0, 6) + '...' + address.slice(-4);
+    addressEl.textContent = formatted;
+    // Force readable cyan text — the topbar background makes text-secondary invisible
+    addressEl.style.color = 'var(--cyan)';
+    addressEl.style.fontFamily = 'var(--font-mono)';
+    addressEl.style.fontSize = '12px';
   }
 }
 
@@ -63,6 +71,7 @@ function updateWalletUI(address) {
 function disconnectWalletUI() {
   walletState = { connected: false, address: null };
   localStorage.removeItem('poc_wallet_connected');
+  localStorage.removeItem('poc_wallet_address');
   if (typeof PocPersist !== 'undefined') PocPersist.setWallet(null);
 
   if (window.PocViem) window.PocViem.disconnectWallet();
@@ -79,7 +88,9 @@ function disconnectWalletUI() {
 }
 
 /**
- * Check for existing wallet connection
+ * Check for existing wallet connection — silently reconnects without user prompt.
+ * Uses eth_accounts (no popup) to verify wallet is still authorized, then
+ * re-initializes the viem wallet client so cross-page state is restored.
  */
 async function checkWalletConnection() {
   if (!window.PocViem) {
@@ -87,20 +98,38 @@ async function checkWalletConnection() {
     return;
   }
 
-  // Check if user previously connected
   const wasConnected = localStorage.getItem('poc_wallet_connected');
-  if (wasConnected) {
-    try {
-      const state = window.PocViem.getWalletState();
-      if (state.connected) {
-        updateWalletUI(state.address);
-        if (typeof PocPersist !== 'undefined') {
-          PocPersist.setWallet(state.address);
+  if (!wasConnected) return;
+
+  try {
+    // eth_accounts does NOT pop a permission dialog — safe to call on every load
+    if (window.ethereum) {
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (accounts && accounts.length > 0) {
+        // Re-initialize the viem wallet client silently (connectWallet calls eth_requestAccounts
+        // which returns immediately when already authorized, no dialog shown)
+        await window.PocViem.connectWallet();
+        const state = window.PocViem.getWalletState();
+        if (state.connected) {
+          updateWalletUI(state.address);
+          // Update stored address in case it changed (e.g. account switch)
+          localStorage.setItem('poc_wallet_address', state.address);
+          // Sync to Neon DB if available
+          if (typeof PocPersist !== 'undefined') {
+            PocPersist.setWallet(state.address);
+          }
+          return;
         }
       }
-    } catch (e) {
-      // Silent fail - wallet might not be available
     }
+
+    // Wallet is no longer authorized — clear stale state but don't show error
+    localStorage.removeItem('poc_wallet_connected');
+    localStorage.removeItem('poc_wallet_address');
+  } catch (e) {
+    // Silent fail — wallet may not be available (e.g. non-web3 browser)
+    localStorage.removeItem('poc_wallet_connected');
+    localStorage.removeItem('poc_wallet_address');
   }
 }
 

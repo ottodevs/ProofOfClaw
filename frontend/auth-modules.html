@@ -113,8 +113,8 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   </nav>
   <div class="sidebar-bottom">
     <div id="poc-connection-slot"></div>
-    <a href="soul-vault.html" class="btn-new-agent">+ New Agent</a>
-    <a href="index.html" class="btn-home">&larr; Back to Home</a>
+    <a href="agents.html" class="btn-new-agent">+ New Agent</a>
+    <a href="index.html" class="btn-home">&#x2190; Back to Home</a>
   </div>
 </aside>
 
@@ -128,9 +128,9 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
     <span class="topbar-title">Authentication Modules</span>
   </div>
   <div class="topbar-right">
-    <button id="wallet-connect-btn" class="eth-badge" style="background:transparent;cursor:pointer;" onclick="connectWalletUI()">Connect Wallet</button>
+    <button id="wallet-connect-btn" style="background:transparent;border:1px solid var(--border-cyan);color:var(--cyan);padding:5px 14px;border-radius:6px;font-family:var(--font-mono);font-size:12px;font-weight:600;letter-spacing:0.04em;cursor:pointer;transition:all 0.2s;" onclick="connectWalletUI()">Connect Wallet</button>
     <div id="wallet-display" style="display:none;align-items:center;gap:8px;">
-      <span id="wallet-address" style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);"></span>
+      <span id="wallet-address" style="font-family:var(--font-mono);font-size:12px;color:var(--cyan);"></span>
       <span class="status-dot" style="background:var(--green);display:inline-block;width:8px;height:8px;border-radius:50%;"></span>
     </div>
     <div class="status-badge">
@@ -147,6 +147,7 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
 
 <script type="module" src="viem-client.js"></script>
 <script src="wallet.js"></script>
+<script src="nav.js"></script>
 <script src="shared.js"></script>
 <script src="poc-api.js"></script>
 <script src="auth-modules-panel.js"></script>
