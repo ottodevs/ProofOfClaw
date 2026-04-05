@@ -137,7 +137,7 @@ contract DeployMultiChainScript is Script {
         console.log("======================================================");
         console.log("  Chain:   ", _chainName(chainId));
         console.log("  Chain ID:", chainId);
-        console.log("  Testnet: ", _isTestnet(chainId) ? "yes" : "NO — MAINNET DEPLOYMENT");
+        console.log("  Testnet: ", _isTestnet(chainId) ? "yes" : unicode"NO \u2014 MAINNET DEPLOYMENT");
         console.log("------------------------------------------------------");
     }
 

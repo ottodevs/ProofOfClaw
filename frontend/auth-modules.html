@@ -113,14 +113,18 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   </nav>
   <div class="sidebar-bottom">
     <div id="poc-connection-slot"></div>
-    <a href="soul-vault.html" class="sidebar-btn primary">+ New Agent</a>
-    <a href="index.html" class="sidebar-btn ghost">Back to Home</a>
+    <a href="soul-vault.html" class="btn-new-agent">+ New Agent</a>
+    <a href="index.html" class="btn-home">&larr; Back to Home</a>
   </div>
 </aside>
+
+<!-- Mobile sidebar overlay -->
+<div class="sidebar-overlay" onclick="closeMobileSidebar()"></div>
 
 <!-- ═══════ TOPBAR ═══════ -->
 <header class="topbar" role="banner">
   <div class="topbar-left">
+    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Open menu">&#9776;</button>
     <span class="topbar-title">Authentication Modules</span>
   </div>
   <div class="topbar-right">

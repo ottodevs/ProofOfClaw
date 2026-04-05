@@ -1668,7 +1668,8 @@ contract EndToEndIntegrationTest is Test {
         ProofOfClawINFT.AgentINFT memory agent = inft.getAgent(tokenId);
         assertEq(agent.totalProofs, 5);
 
-        // Update reputation via admin
+        // Update reputation via verifier
+        vm.prank(address(verifierContract));
         inft.updateReputation(tokenId, 98);
         assertEq(inft.getAgent(tokenId).reputationScore, 98);
     }

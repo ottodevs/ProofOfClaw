@@ -888,9 +888,6 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   }
   .topbar {
     left: 0 !important;
-    padding: 0 1rem;
-  }
-  .top-bar {
     padding: 0.75rem 1rem;
     flex-wrap: wrap;
     gap: 0.5rem;

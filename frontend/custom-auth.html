@@ -6,120 +6,78 @@
 <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), bluetooth=(), hid=(), usb=(), serial=(), speech-synthesis=(), speech-recognition=()">
 <title>Custom Auth — Proof of Claw</title>
 <meta name="description" content="Add custom authentication secrets">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" type="image/x-icon" href="public/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="public/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="public/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
 <style>
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-:root {
-  --bg-primary: #06080d;
-  --cyan: #00e5ff;
-  --text-primary: #e8ecf4;
-  --text-secondary: #8892a4;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-cyan: rgba(0, 229, 255, 0.2);
-  --cyan-glow: rgba(0, 229, 255, 0.15);
-  --font-display: 'Syne', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-}
-body {
-  font-family: var(--font-mono);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 14px;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-body::after {
-  content: '';
+/* ═══ TOPBAR ═══ */
+.topbar {
   position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
-  pointer-events: none;
-  z-index: 9999;
-}
-.grid-bg {
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-  z-index: 0;
-}
-nav {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
-  padding: 1rem 2rem;
+  top: 0;
+  left: var(--sidebar-w);
+  right: 0;
+  height: var(--topbar-h);
+  background: rgba(6, 8, 13, 0.88);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(6, 8, 13, 0.92);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
+  padding: 0 1.75rem;
+  z-index: 150;
+  transition: left 0.25s ease;
 }
-.nav-logo {
+
+body.sidebar-collapsed .topbar { left: var(--sidebar-w-collapsed); }
+
+.topbar-left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  text-decoration: none;
+  gap: 1.25rem;
 }
-.nav-logo .claw-icon { width: 32px; height: 32px; position: relative; }
-.nav-logo .claw-icon::before {
-  content: '\29C1';
-  font-size: 28px;
-  color: var(--cyan);
-  filter: drop-shadow(0 0 8px var(--cyan));
-}
-.nav-title {
+
+.topbar-title {
   font-family: var(--font-display);
-  font-weight: 800;
   font-size: 1.1rem;
-  letter-spacing: -0.02em;
+  font-weight: 700;
   color: var(--text-primary);
 }
-.nav-links { display: flex; gap: 1.75rem; list-style: none; }
-.nav-links a {
-  text-decoration: none;
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 500;
-  transition: color 0.2s;
-}
-.nav-links a:hover, .nav-links a.active { color: var(--cyan); }
-.back-link {
-  padding: 0.35rem 0.9rem;
-  border: 1px solid var(--border-cyan);
-  border-radius: 100px;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: var(--cyan);
-  background: var(--cyan-glow);
-  text-decoration: none;
-  transition: all 0.2s;
-}
-.back-link:hover {
-  background: rgba(0, 229, 255, 0.22);
-  box-shadow: 0 0 20px rgba(0, 229, 255, 0.12);
-}
-main {
-  position: relative;
-  z-index: 1;
-  flex: 1;
+
+.topbar-right {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 100px 2rem 2rem;
+  gap: 1rem;
 }
+
+/* ═══ MAIN CONTENT ═══ */
+.main-content {
+  position: relative;
+  z-index: 1;
+  margin-left: var(--sidebar-w);
+  margin-top: var(--topbar-h);
+  padding: 2rem;
+  min-height: calc(100vh - var(--topbar-h));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  transition: margin-left 0.25s ease;
+}
+
+body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); }
+
+@media (max-width: 768px) {
+  .topbar { left: 0; }
+  .main-content { margin-left: 0; }
+}
+
+/* ═══ FORM STYLES ═══ */
 .container {
   max-width: 480px;
   width: 100%;
+  padding-top: 1rem;
 }
 h1 {
   font-family: var(--font-display);
@@ -255,24 +213,49 @@ button[type="submit"]:hover {
 <body>
 <div class="grid-bg"></div>
 
-<nav>
-  <a href="auth-modules.html" class="nav-logo">
-    <div class="claw-icon"></div>
-    <span class="nav-title">Proof of Claw</span>
-  </a>
-  <ul class="nav-links">
-    <li><a href="dashboard.html">Dashboard</a></li>
-    <li><a href="agents.html">Agents</a></li>
-    <li><a href="auth-modules.html" class="active">Auth</a></li>
-  </ul>
-  <a href="auth-modules.html" class="back-link">← Back to Auth</a>
-</nav>
+<!-- ═══════ SIDEBAR ═══════ -->
+<div class="sidebar-overlay" onclick="closeMobileSidebar()"></div>
 
-<main>
+<aside class="sidebar" role="complementary" aria-label="App sidebar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar">&#x276E;</button>
+  <a href="index.html" class="sidebar-logo">
+    <img src="public/logoproofofclaw.png" alt="Proof of Claw" class="claw-icon">
+    <span class="logo-text">Proof of Claw</span>
+  </a>
+  <nav class="sidebar-nav" aria-label="App navigation">
+    <a href="agents.html"><span class="nav-icon">&#x2726;</span> Agents</a>
+    <a href="dashboard.html"><span class="nav-icon">&#x25A3;</span> Dashboard</a>
+    <a href="auth-modules.html" class="active" aria-current="page"><span class="nav-icon">&#x1F512;</span> Auth Modules</a>
+    <a href="messages.html"><span class="nav-icon">&#x2709;</span> Messages</a>
+    <a href="proofs.html"><span class="nav-icon">&#x2731;</span> Proofs</a>
+    <a href="kanban.html"><span class="nav-icon">&#x25A0;</span> Kanban</a>
+    <a href="soul-vault.html"><span class="nav-icon">&#x2B23;</span> Soul Vault</a>
+    <a href="approve.html"><span class="nav-icon">&#x2714;</span> Approve</a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div id="poc-connection-slot"></div>
+    <a href="soul-vault.html" class="btn-new-agent">+ New Agent</a>
+    <a href="index.html" class="btn-home">&larr; Back to Home</a>
+  </div>
+</aside>
+
+<!-- ═══════ TOPBAR ═══════ -->
+<header class="topbar" role="banner">
+  <div class="topbar-left">
+    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Open menu">&#9776;</button>
+    <span class="topbar-title">Custom Auth</span>
+  </div>
+  <div class="topbar-right">
+    <a href="auth-modules.html" class="btn-home" style="font-size:0.7rem;">&larr; Back to Auth</a>
+  </div>
+</header>
+
+<!-- ═══════ MAIN CONTENT ═══════ -->
+<main class="main-content" role="main">
   <div class="container">
-    <h1>🔑 <span>Custom Auth</span></h1>
+    <h1>&#x1F511; <span>Custom Auth</span></h1>
     <p class="subtitle">Add your own API keys and secrets</p>
-    
+
     <div class="form-card">
       <form id="custom-auth-form">
         <div class="form-group">
@@ -280,13 +263,13 @@ button[type="submit"]:hover {
           <input type="text" id="secret-name" placeholder="e.g., botfather-key, openai-api-key" required>
           <p class="hint">Unique identifier for this secret</p>
         </div>
-        
+
         <div class="form-group">
           <label for="secret-value">Secret Value</label>
           <textarea id="secret-value" placeholder="Paste your API key or secret here..." required></textarea>
           <p class="hint">The actual secret value (encrypted in storage)</p>
         </div>
-        
+
         <div class="form-group">
           <label for="secret-type">Type</label>
           <select id="secret-type">
@@ -297,16 +280,16 @@ button[type="submit"]:hover {
             <option value="other">Other</option>
           </select>
         </div>
-        
+
         <div class="form-group">
           <label for="secret-service">Service</label>
           <input type="text" id="secret-service" placeholder="e.g., telegram, openai, github">
           <p class="hint">Optional: Which service this is for</p>
         </div>
-        
+
         <button type="submit">Save Secret</button>
       </form>
-      
+
       <div class="saved-secrets">
         <h3>Saved Secrets</h3>
         <ul class="secret-list" id="secret-list">
@@ -317,6 +300,7 @@ button[type="submit"]:hover {
   </div>
 </main>
 
+<script src="shared.js"></script>
 <script>
 // NOTE: Testnet demo credentials — move to backend proxy before production
 const ONECLAW_API_KEY = window.__POC_CONFIG?.ONECLAW_API_KEY || 'ocv_XsJpRrM_b5aB7dcd-tzzg6yUzZSIuz2dlLs431DBs4U';
@@ -341,7 +325,7 @@ async function authenticateWithOneClaw() {
     console.log('1claw: Skipping auth on localhost (CORS restricted)');
     return false;
   }
-  
+
   try {
     const response = await fetch(`${ONECLAW_ENDPOINT}/auth/agent-token`, {
       method: 'POST',
@@ -364,12 +348,12 @@ async function authenticateWithOneClaw() {
 function loadSavedSecrets() {
   const secrets = JSON.parse(localStorage.getItem('poc_custom_secrets') || '{}');
   const list = document.getElementById('secret-list');
-  
+
   if (Object.keys(secrets).length === 0) {
     list.innerHTML = '<li class="empty-state">No secrets saved yet</li>';
     return;
   }
-  
+
   list.innerHTML = Object.entries(secrets).map(([name, data]) => `
     <li class="secret-item">
       <div>
@@ -392,7 +376,7 @@ async function saveSecret(name, value, type, service) {
   secrets[name] = { value, type, service, createdAt: Date.now() };
   localStorage.setItem('poc_custom_secrets', JSON.stringify(secrets));
   if (typeof PocPersist !== 'undefined') PocPersist.savePref('poc_custom_secrets', secrets);
-  
+
   // Try to sync to 1claw if connected (skip on localhost due to CORS)
   if (!isLocalhost && oneClawToken) {
     try {
@@ -415,7 +399,7 @@ async function saveSecret(name, value, type, service) {
   } else if (isLocalhost) {
     console.log('Saved locally (1claw CORS restricted on localhost)');
   }
-  
+
   return true;
 }
 
@@ -429,26 +413,26 @@ function deleteSecret(name) {
 
 document.getElementById('custom-auth-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  
+
   const name = document.getElementById('secret-name').value.trim();
   const value = document.getElementById('secret-value').value.trim();
   const type = document.getElementById('secret-type').value;
   const service = document.getElementById('secret-service').value.trim();
-  
+
   if (!name || !value) {
     alert('Name and value are required');
     return;
   }
-  
+
   await saveSecret(name, value, type, service);
-  
+
   // Clear form
   document.getElementById('secret-name').value = '';
   document.getElementById('secret-value').value = '';
   document.getElementById('secret-service').value = '';
-  
+
   loadSavedSecrets();
-  
+
   // Show success
   const btn = document.querySelector('button[type="submit"]');
   const originalText = btn.textContent;
