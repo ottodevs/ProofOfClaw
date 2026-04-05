@@ -1,10 +1,10 @@
 /**
- * Proof of Claw — API Connection Layer
- * Shared across all app pages. Manages connection to a live OpenClaw agent runtime.
+ * Proof of Claw — Universal Agent Connection Layer
+ * Framework-agnostic: supports OpenClaw, Swarm, Agent Zero, PicoClaw, ElizaOS, and any agent with an HTTP API.
  *
  * localStorage keys:
  *   poc_agents       — array of agent objects (synced from live runtime)
- *   poc_connection    — { url, agentId, ens, connectedAt } when connected to live agent
+ *   poc_connection    — { url, agentId, ens, framework, connectedAt } when connected to live agent
  */
 
 const PocAPI = (() => {
@@ -24,70 +24,195 @@ const PocAPI = (() => {
     return !!getConnection();
   }
 
-  // ── API calls ──
-  async function fetchStatus(baseUrl) {
-    const r = await fetch(`${baseUrl}/api/status`);
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    return r.json();
-  }
-  async function fetchActivity(baseUrl) {
-    const r = await fetch(`${baseUrl}/api/activity`);
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    return r.json();
-  }
-  async function fetchProofs(baseUrl) {
-    const r = await fetch(`${baseUrl}/api/proofs`);
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    return r.json();
-  }
-  async function fetchMessages(baseUrl) {
-    const r = await fetch(`${baseUrl}/api/messages`);
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    return r.json();
-  }
-  async function sendMessage(baseUrl, to, content) {
-    const r = await fetch(`${baseUrl}/api/messages/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, content })
-    });
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    return r.json();
-  }
-  async function healthCheck(baseUrl) {
-    const r = await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(3000) });
-    return r.ok;
-  }
+  // ── Framework detection ──
+  // Probe multiple endpoints to identify what framework the agent is running
+  const FRAMEWORK_PROBES = {
+    health:  ['/health', '/api/status', '/status', '/ready', '/api/v1/status', '/healthz'],
+    status:  ['/api/status', '/health', '/status', '/api/v1/status', '/agents'],
+    chat:    ['/api/messages/send', '/v1/chat', '/api/chat', '/api/v1/send', '/chat/completions'],
+    activity:['/api/activity'],
+    proofs:  ['/api/proofs'],
+    messages:['/api/messages', '/api/v1/messages', '/api/webhooks/messages'],
+  };
 
-  // ── Spec validation ──
-  async function validateSpec(baseUrl) {
-    const results = {};
-    const check = async (name, method, path, body) => {
+  // Try a list of paths, return first that works
+  async function probeEndpoints(baseUrl, paths, method, body, timeout) {
+    timeout = timeout || 5000;
+    for (const path of paths) {
       try {
-        const opts = { method, signal: AbortSignal.timeout(5000) };
+        const opts = { method: method || 'GET', signal: AbortSignal.timeout(timeout) };
         if (body) {
           opts.headers = { 'Content-Type': 'application/json' };
           opts.body = JSON.stringify(body);
         }
         const r = await fetch(`${baseUrl}${path}`, opts);
-        if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
-        const contentType = r.headers.get('content-type') || '';
-        const data = contentType.includes('json') ? await r.json() : null;
-        return { ok: true, data };
-      } catch (e) {
-        return { ok: false, error: e.message };
-      }
+        if (!r.ok) continue;
+        const ct = r.headers.get('content-type') || '';
+        const data = ct.includes('json') ? await r.json() : null;
+        return { ok: true, path, data };
+      } catch {}
+    }
+    return { ok: false };
+  }
+
+  // Detect which framework from a status/health response
+  function detectFramework(data, hitPath) {
+    if (!data) return 'unknown';
+    // ElizaOS: returns { agents: [...] } from /agents
+    if (hitPath === '/agents' || (Array.isArray(data.agents) && data.agents[0]?.name)) return 'eliza';
+    // Swarm: /health returns { status, agents (number), gateways, connections }
+    if (typeof data.agents === 'number' && data.gateways !== undefined) return 'swarm';
+    // OpenClaw: /api/status returns { agent, status, version } or { agent_id, ... }
+    if (data.agent || data.agent_id) return 'openclaw';
+    // Agent Zero: /health returns { status: "ok" } — minimal
+    if (data.status === 'ok' && Object.keys(data).length <= 3) return 'agentzero';
+    // PicoClaw: /health or /ready
+    if (hitPath === '/ready' || hitPath === '/healthz') return 'picoclaw';
+    // Generic: has a status field
+    if (data.status) return 'generic';
+    return 'unknown';
+  }
+
+  // Normalize any framework's status into our standard shape
+  function normalizeStatus(data, framework) {
+    if (!data) data = {};
+    const norm = {
+      agent_id: data.agent_id || data.agent || data.agentId || data.name || data.id || null,
+      ens_name: data.ens_name || data.ens || null,
+      status: data.status || 'online',
+      network: data.network || data.chain || null,
+      version: data.version || null,
+      framework: framework,
+      allowed_tools: data.allowed_tools || data.skills || data.tools || data.capabilities || [],
+      max_value_autonomous_wei: data.max_value_autonomous_wei || 0,
+      endpoint_allowlist: data.endpoint_allowlist || [],
+      stats: {
+        total_actions: data.stats?.total_actions || data.stats?.actions || data.actions || 0,
+        proofs_generated: data.stats?.proofs_generated || data.stats?.proofs || data.proofs || 0,
+      },
+      uptime_secs: data.uptime_secs || data.uptime || 0,
+    };
+    // ElizaOS: first agent in array
+    if (framework === 'eliza' && Array.isArray(data.agents) && data.agents[0]) {
+      const a = data.agents[0];
+      norm.agent_id = a.id || a.name || norm.agent_id;
+      norm.status = 'online';
+      norm._elizaAgentId = a.id; // needed for ElizaOS chat routing
+    }
+    // Swarm: use hub info
+    if (framework === 'swarm') {
+      norm.agent_id = norm.agent_id || 'swarm-hub';
+      norm.stats.total_actions = data.connections || 0;
+    }
+    // Fallback ID
+    if (!norm.agent_id) norm.agent_id = framework + '-agent';
+    if (!norm.network) norm.network = 'unknown';
+    return norm;
+  }
+
+  // ── API calls (framework-aware) ──
+  async function fetchStatus(baseUrl) {
+    const result = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.status, 'GET', null, 5000);
+    if (!result.ok) throw new Error('No status endpoint found');
+    const fw = detectFramework(result.data, result.path);
+    return normalizeStatus(result.data, fw);
+  }
+
+  async function fetchActivity(baseUrl) {
+    const result = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.activity);
+    if (!result.ok) return null;
+    return result.data;
+  }
+  async function fetchProofs(baseUrl) {
+    const result = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.proofs);
+    if (!result.ok) return null;
+    return result.data;
+  }
+  async function fetchMessages(baseUrl) {
+    const result = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.messages);
+    if (!result.ok) return null;
+    return result.data;
+  }
+
+  async function sendMessage(baseUrl, to, content) {
+    const conn = getConnection();
+    const fw = conn?.framework || 'unknown';
+
+    // Framework-specific chat endpoints (try specific first, then probe all)
+    const fwPaths = {
+      openclaw:  ['/v1/chat', '/api/messages/send', '/api/chat'],
+      swarm:     ['/api/v1/send', '/api/webhooks/reply', '/api/messages/send'],
+      agentzero: ['/api/chat', '/v1/chat'],
+      picoclaw:  ['/chat/completions', '/api/chat'],
+      eliza:     [conn?._elizaAgentId ? `/${conn._elizaAgentId}/message` : '/message', '/api/chat'],
+    };
+    const paths = fwPaths[fw] || FRAMEWORK_PROBES.chat;
+
+    // Build body variants per framework
+    const bodies = {
+      openclaw:  { message: content, session_id: to || 'default' },
+      swarm:     { to, content, type: 'text' },
+      agentzero: { message: content, session_id: to || 'default' },
+      picoclaw:  { model: 'default', messages: [{ role: 'user', content }] },
+      eliza:     { text: content, userId: to || 'user', roomId: to || 'default' },
+    };
+    const defaultBody = { to, content, message: content, session_id: to || 'default' };
+    const body = bodies[fw] || defaultBody;
+
+    for (const path of paths) {
+      try {
+        const r = await fetch(`${baseUrl}${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (r.ok) return r.json();
+      } catch {}
+    }
+    throw new Error('No chat endpoint responded');
+  }
+
+  async function healthCheck(baseUrl) {
+    const result = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.health, 'GET', null, 3000);
+    return result.ok;
+  }
+
+  // ── Spec validation (framework-agnostic) ──
+  async function validateSpec(baseUrl) {
+    const results = {};
+
+    // Probe health (any of the known paths)
+    results.health = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.health, 'GET', null, 5000);
+    // Probe status (may be same as health for some frameworks)
+    results.status = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.status, 'GET', null, 5000);
+    // Optional endpoints
+    results.activity = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.activity);
+    results.proofs = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.proofs);
+    results.messages = await probeEndpoints(baseUrl, FRAMEWORK_PROBES.messages);
+
+    // Valid if we got any response from health or status
+    results.valid = results.health.ok || results.status.ok;
+
+    // Detect framework and normalize
+    const statusData = results.status.ok ? results.status : results.health;
+    const fw = detectFramework(statusData.data, statusData.path);
+    results.framework = fw;
+
+    if (statusData.ok && statusData.data) {
+      results.agentPreview = normalizeStatus(statusData.data, fw);
+    } else {
+      results.agentPreview = null;
+    }
+
+    // Surface which paths actually worked
+    results.detectedPaths = {
+      health: results.health.ok ? results.health.path : null,
+      status: results.status.ok ? results.status.path : null,
+      activity: results.activity.ok ? results.activity.path : null,
+      proofs: results.proofs.ok ? results.proofs.path : null,
+      messages: results.messages.ok ? results.messages.path : null,
     };
 
-    results.health = await check('health', 'GET', '/health');
-    results.status = await check('status', 'GET', '/api/status');
-    results.activity = await check('activity', 'GET', '/api/activity');
-    results.proofs = await check('proofs', 'GET', '/api/proofs');
-    results.messages = await check('messages', 'GET', '/api/messages');
-    // Skip /api/chat — don't auto-send a message during validation
-
-    results.valid = results.health.ok && results.status.ok;
-    results.agentPreview = results.status.ok ? results.status.data : null;
     return results;
   }
 
@@ -97,20 +222,22 @@ const PocAPI = (() => {
     let baseUrl = url.replace(/\/+$/, '');
     if (!baseUrl.startsWith('http')) baseUrl = 'http://' + baseUrl;
 
-    // Health check
+    // Health check (probes all known paths)
     const ok = await healthCheck(baseUrl);
-    if (!ok) throw new Error('Agent not reachable');
+    if (!ok) throw new Error('Agent not reachable — no health or status endpoint found');
 
-    // Fetch status
+    // Fetch & normalize status
     const status = await fetchStatus(baseUrl);
 
-    // Save connection
+    // Save connection with detected framework
     const conn = {
       url: baseUrl,
       agentId: status.agent_id,
       ens: status.ens_name,
       status: status.status,
       network: status.network,
+      framework: status.framework,
+      _elizaAgentId: status._elizaAgentId || null,
       connectedAt: new Date().toISOString()
     };
     setConnection(conn);
@@ -141,21 +268,27 @@ const PocAPI = (() => {
   function syncLiveAgent(status, origin) {
     let agents = getAgents();
     const idx = agents.findIndex(a => a.id === status.agent_id);
+    const fw = status.framework || 'unknown';
+    const fwLabels = {
+      openclaw: 'OpenClaw Agent', swarm: 'Swarm Agent', agentzero: 'Agent Zero',
+      picoclaw: 'PicoClaw Agent', eliza: 'ElizaOS Agent', generic: 'Agent', unknown: 'Agent'
+    };
     const agentObj = {
       id: status.agent_id,
       name: status.agent_id,
       ens: status.ens_name,
-      type: 'openclaw-agent',
+      type: fw + '-agent',
+      framework: fw,
       network: status.network,
       skills: status.allowed_tools || [],
       allowedTools: status.allowed_tools || [],
-      valueLimit: Math.floor((status.max_value_autonomous_wei || 0) / 1e18 * 100), // rough USD
+      valueLimit: Math.floor((status.max_value_autonomous_wei || 0) / 1e18 * 100),
       endpoints: (status.endpoint_allowlist || []).join(', '),
       status: 'online',
       live: true,
       origin: origin || 'connected',
       deployedAt: new Date().toISOString(),
-      description: 'Live agent connected via API',
+      description: fwLabels[fw] + ' connected via API',
       stats: {
         actions: status.stats?.total_actions || 0,
         proofs: status.stats?.proofs_generated || 0,
@@ -198,9 +331,9 @@ const PocAPI = (() => {
            <span class="conn-text">${escHtml(conn.agentId)}</span>
            <span class="conn-label">LIVE</span>
          </div>`
-      : `<button class="conn-badge disconnected" aria-label="Connect to OpenClaw agent" onclick="PocAPI.showConnectModal()">
+      : `<button class="conn-badge disconnected" aria-label="Connect agent" onclick="PocAPI.showConnectModal()">
            <span class="conn-dot" aria-hidden="true"></span>
-           <span class="conn-text">Connect OpenClaw</span>
+           <span class="conn-text">Connect Agent</span>
          </button>`;
   }
 
@@ -213,15 +346,15 @@ const PocAPI = (() => {
     modal.innerHTML = `
       <div class="poc-modal" role="dialog" aria-modal="true" aria-labelledby="poc-modal-title">
         <div class="poc-modal-header">
-          <h2 id="poc-modal-title">Connect OpenClaw Agent</h2>
+          <h2 id="poc-modal-title">Connect Agent</h2>
           <button class="poc-modal-close" onclick="PocAPI.hideConnectModal()" aria-label="Close">&times;</button>
         </div>
         <div class="poc-modal-body">
-          <p class="poc-modal-desc">Enter the API endpoint of your running Proof of Claw agent runtime.</p>
+          <p class="poc-modal-desc">Connect any agent framework — OpenClaw, Swarm, Agent Zero, PicoClaw, ElizaOS, or any HTTP agent.</p>
           <div class="poc-form-group">
             <label for="poc-connect-url">Agent API URL</label>
-            <input type="text" id="poc-connect-url" placeholder="http://localhost:8082" value="" autocomplete="url">
-            <div class="poc-form-hint">Default port is 8082 (set via API_PORT in ironclaw/.env).</div>
+            <input type="text" id="poc-connect-url" placeholder="https://xxx.trycloudflare.com" value="" autocomplete="url">
+            <div class="poc-form-hint">Paste your tunnel URL or local address (e.g. http://localhost:8082)</div>
           </div>
           <div id="poc-connect-error" class="poc-error" style="display:none;"></div>
           <div id="poc-connect-success" class="poc-success" style="display:none;"></div>
@@ -232,8 +365,11 @@ const PocAPI = (() => {
         </div>
         <div class="poc-modal-footer">
           <div class="poc-help-text">
-            <strong>How to start your agent:</strong><br>
-            <code>cd agent && AGENT_ID=my-agent ENS_NAME=my.proofofclaw.eth PRIVATE_KEY=0x... cargo run</code>
+            <strong>How to connect:</strong><br>
+            1. Start your agent locally (any framework)<br>
+            2. Expose via tunnel: <code>cloudflared tunnel --url http://localhost:PORT</code><br>
+            3. Paste the URL above — we auto-detect your framework<br>
+            <span style="opacity:0.6;font-size:11px;">Supports /health, /api/status, /agents, /ready, and more.</span>
           </div>
         </div>
       </div>`;

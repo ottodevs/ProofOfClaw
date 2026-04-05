@@ -2629,14 +2629,14 @@
     </div>
     <div class="modal-body">
       <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px;line-height:1.6;">
-        Connect any agent that implements the <a href="docs.html#agent-api-spec" style="color:var(--cyan);">Proof of Claw Agent API</a>.
-        Works with Python, Node, Go, Rust, or any framework.
+        Connect any agent — we auto-detect your framework.
+        Supports <strong style="color:var(--cyan);">OpenClaw, Swarm, Agent Zero, PicoClaw, ElizaOS</strong>, and any HTTP agent.
       </p>
       <div class="form-group">
         <label>Agent API URL</label>
-        <input type="text" id="connect-url-input" placeholder="http://localhost:8420" autocomplete="url"
+        <input type="text" id="connect-url-input" placeholder="https://xxx.trycloudflare.com" autocomplete="url"
                style="width:100%;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:var(--font-mono);font-size:13px;">
-        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Default port is 8420. Your agent must have CORS enabled.</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Paste your Cloudflare tunnel URL or local address. CORS must be enabled.</div>
       </div>
 
       <!-- Validation Results -->
@@ -5209,7 +5209,7 @@ function openConnectModal() {
   connectValidationResult = null;
   const urlInput = document.getElementById('connect-url-input');
   const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') urlInput.value = 'http://localhost:8420';
+  if (host === 'localhost' || host === '127.0.0.1') urlInput.value = 'http://localhost:18789';
   urlInput.focus();
 }
 
@@ -5237,19 +5237,21 @@ async function doValidateAgent() {
 
   const checklist = document.getElementById('connect-checklist');
   const endpoints = [
-    { key: 'health', label: 'GET /health', required: true },
-    { key: 'status', label: 'GET /api/status', required: true },
-    { key: 'activity', label: 'GET /api/activity', required: false },
-    { key: 'proofs', label: 'GET /api/proofs', required: false },
-    { key: 'messages', label: 'GET /api/messages', required: false },
+    { key: 'health', label: 'Health Check', required: false },
+    { key: 'status', label: 'Status / Info', required: false },
+    { key: 'activity', label: 'Activity Feed', required: false },
+    { key: 'proofs', label: 'Proofs', required: false },
+    { key: 'messages', label: 'Messages', required: false },
   ];
 
   // Show checklist with pending state
-  checklist.innerHTML = endpoints.map(ep =>
+  checklist.innerHTML = `
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Auto-detecting framework and endpoints...</div>
+  ` + endpoints.map(ep =>
     `<div id="chk-${ep.key}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;font-size:12px;">
       <span class="chk-icon" style="width:18px;text-align:center;color:var(--text-dim);">&#x23F3;</span>
-      <span style="flex:1;color:var(--text-secondary);">${ep.label}</span>
-      <span style="font-size:10px;color:var(--text-dim);">${ep.required ? 'required' : 'optional'}</span>
+      <span class="chk-path" style="flex:1;color:var(--text-secondary);">${ep.label}</span>
+      <span style="font-size:10px;color:var(--text-dim);">probing...</span>
     </div>`
   ).join('');
   document.getElementById('connect-validation').style.display = 'block';
@@ -5257,28 +5259,42 @@ async function doValidateAgent() {
   try {
     const result = await PocAPI.validateSpec(baseUrl);
     connectValidationResult = { ...result, baseUrl };
+    const paths = result.detectedPaths || {};
 
-    // Update checklist
+    // Update checklist with detected paths
     endpoints.forEach(ep => {
       const row = document.getElementById('chk-' + ep.key);
       const icon = row.querySelector('.chk-icon');
+      const pathLabel = row.querySelector('.chk-path');
       const r = result[ep.key];
+      const detectedPath = paths[ep.key];
       if (r && r.ok) {
         icon.innerHTML = '&#x2705;';
         row.style.borderColor = 'rgba(0,230,118,0.3)';
+        if (detectedPath) pathLabel.textContent = ep.label + ' — ' + detectedPath;
       } else {
-        icon.innerHTML = ep.required ? '&#x274C;' : '&#x26A0;';
-        row.style.borderColor = ep.required ? 'rgba(255,61,90,0.3)' : 'rgba(255,183,77,0.3)';
+        icon.innerHTML = '&#x26A0;';
+        row.style.borderColor = 'rgba(255,183,77,0.3)';
+        pathLabel.textContent = ep.label + ' — not found';
       }
     });
 
-    // Show preview if status succeeded
+    // Show framework detection badge
+    if (result.framework && result.framework !== 'unknown') {
+      const fwNames = { openclaw: 'OpenClaw', swarm: 'Swarm Protocol', agentzero: 'Agent Zero', picoclaw: 'PicoClaw', eliza: 'ElizaOS', generic: 'Generic HTTP' };
+      const fwBadge = document.createElement('div');
+      fwBadge.style.cssText = 'margin-top:8px;padding:8px 12px;background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);border-radius:6px;font-size:12px;color:var(--cyan);';
+      fwBadge.textContent = 'Detected framework: ' + (fwNames[result.framework] || result.framework);
+      checklist.appendChild(fwBadge);
+    }
+
+    // Show preview if we got agent info
     if (result.agentPreview) {
       const p = result.agentPreview;
       document.getElementById('connect-preview-content').innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
           <div><span style="color:var(--text-dim);">Agent ID:</span> <strong style="color:var(--text-primary);">${esc(p.agent_id || 'unknown')}</strong></div>
-          <div><span style="color:var(--text-dim);">ENS:</span> <strong style="color:var(--cyan);">${esc(p.ens_name || 'none')}</strong></div>
+          <div><span style="color:var(--text-dim);">Framework:</span> <strong style="color:var(--cyan);">${esc(p.framework || 'unknown')}</strong></div>
           <div><span style="color:var(--text-dim);">Network:</span> ${esc(p.network || 'unknown')}</div>
           <div><span style="color:var(--text-dim);">Status:</span> ${esc(p.status || 'unknown')}</div>
           <div><span style="color:var(--text-dim);">Tools:</span> ${esc((p.allowed_tools || []).join(', ') || 'none')}</div>
@@ -5293,7 +5309,7 @@ async function doValidateAgent() {
       confirmBtn.style.display = '';
       confirmBtn.disabled = false;
     } else {
-      errEl.textContent = 'Required endpoints failed. Your agent must implement /health and /api/status.';
+      errEl.textContent = 'No reachable endpoints found. Your agent must respond to at least one of: /health, /api/status, /status, /agents, /ready';
       errEl.style.display = 'block';
       btn.disabled = false;
       btn.textContent = 'Retry';

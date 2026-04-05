@@ -51,7 +51,10 @@
       "Bash(node -c sanitize.js)",
       "Bash(grep -E \"\\\\.\\(js|ts|py|rs\\)$\")",
       "Bash(grep -rn \"kanban\\\\|board\\\\|column\\\\|card\" /home/god/ProofOfClaw/ProofOfClaw/frontend/*.css)",
-      "Bash(python3)"
+      "Bash(python3)",
+      "Read(//tmp/Swarm/**)",
+      "Bash(git rebase:*)",
+      "Bash(GIT_EDITOR=true git rebase --continue)"
     ]
   }
 }
