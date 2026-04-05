@@ -1236,27 +1236,66 @@ async function startRegister() {
   const successEl = document.getElementById('deploy-success');
   successEl.classList.add('active');
   successEl.querySelector('.success-icon').innerHTML = '<div style="animation:spin 1s linear infinite;">&#x2699;</div>';
-  successEl.querySelector('h3').textContent = 'Registering on 0G Chain...';
-  document.getElementById('success-message').textContent = 'Validating configuration and preparing on-chain registration...';
+  successEl.querySelector('h3').textContent = 'Connecting Wallet...';
+  document.getElementById('success-message').textContent = 'Please approve the connection in your wallet...';
 
   try {
-    // Check wallet connection
+    // Check if blockchain module is loaded
     if (!window.PocViem) {
-      throw new Error('Blockchain module not loaded. Please refresh and try again.');
+      throw new Error('Blockchain module not loaded. Please refresh the page and try again.');
     }
 
-    const walletState = window.PocViem.getWalletState();
+    // Check wallet connection
+    let walletState = window.PocViem.getWalletState();
+    
     if (!walletState.connected) {
-      await connectWalletUI();
-      if (!window.PocViem.getWalletState().connected) {
-        throw new Error('Wallet connection required for registration');
+      document.getElementById('success-message').textContent = 'Waiting for wallet connection... Click Connect Wallet if prompted.';
+      
+      try {
+        await connectWalletUI();
+      } catch (e) {
+        throw new Error('Wallet connection rejected. Please connect your wallet to continue.');
+      }
+      
+      // Re-check after connection attempt
+      walletState = window.PocViem.getWalletState();
+      if (!walletState.connected) {
+        throw new Error('Wallet not connected. Please click "Connect Wallet" button first.');
       }
     }
 
     // Switch to target network
     const network = wizardData.network || 'og_testnet';
-    await window.PocViem.switchNetwork(network);
+    
+    successEl.querySelector('h3').textContent = 'Switching Network...';
+    document.getElementById('success-message').textContent = 
+      `Please approve the network switch to ${getNetworkDisplayName(network)} in your wallet...`;
+    
+    try {
+      await window.PocViem.switchNetwork(network);
+    } catch (switchError) {
+      // If switching failed, try to provide helpful guidance
+      if (switchError.code === 4902 || switchError.message?.includes('unrecognized chain')) {
+        document.getElementById('success-message').textContent = 
+          `Network ${getNetworkDisplayName(network)} needs to be added to your wallet. Please approve the addition.`;
+        
+        // The switchNetwork function should handle adding, but if it fails:
+        throw new Error(
+          `Please add ${getNetworkDisplayName(network)} to your wallet manually:\n` +
+          `Chain ID: ${network === 'og_testnet' ? '16602' : '16661'}\n` +
+          `RPC: https://evmrpc-testnet.0g.ai\n` +
+          `Currency: OG`
+        );
+      }
+      throw switchError;
+    }
+    
+    // Initialize viem client for the selected network
     window.PocViem.init(network);
+    
+    // Now proceed with registration
+    successEl.querySelector('h3').textContent = 'Preparing Registration...';
+    document.getElementById('success-message').textContent = 'Building agent configuration...';
 
     // Prepare agent configuration
     const agentConfig = {
@@ -1301,8 +1340,23 @@ async function startRegister() {
     }
 
   } catch (error) {
-    handleRegistrationError({ error: error.message });
+    console.error('[soul-vault] Registration error:', error);
+    handleRegistrationError({ 
+      error: error.message || 'Registration failed',
+      details: error.stack 
+    });
   }
+}
+
+// Helper to get display name for network
+function getNetworkDisplayName(network) {
+  const names = {
+    'sepolia': 'Sepolia',
+    'og_testnet': '0G Testnet',
+    'mainnet': 'Ethereum Mainnet',
+    'og_mainnet': '0G Mainnet'
+  };
+  return names[network] || network;
 }
 
 // Update UI during registration progress
@@ -1533,6 +1587,7 @@ window.startRegister = startRegister;
 window.startDeploy = startDeploy;
 window.retryRegistration = retryRegistration;
 window.resetVault = resetVault;
+window.getNetworkDisplayName = getNetworkDisplayName;
 </script>
 <script src="poc-api.js"></script>
 <script>
