@@ -401,18 +401,41 @@ export class AgentRegistrationManager {
   }
 
   async executeRegistration(data, walletClient, publicClient, networkConfig) {
-    // Placeholder for actual contract interaction
-    // In production, this would call the smart contract
-    
-    // Mock transaction for development
-    const mockTxHash = '0x' + Array(64).fill(0).map(() => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
-    
-    return {
-      txHash: mockTxHash,
-      tokenId: Math.floor(Math.random() * 10000) + 1
+    // Use the global viem client if available, or fall back to the window.PocViem
+    const viem = window.PocViem;
+    if (!viem) {
+      throw new Error('Viem client not available. Please ensure wallet is connected.');
+    }
+
+    // Ensure wallet is connected
+    const walletState = viem.getWalletState();
+    if (!walletState.connected) {
+      throw new Error('Wallet not connected. Please connect your wallet first.');
+    }
+
+    // Get the actual wallet and public clients from the viem module
+    // We need to call the registerAgentOnchain function through the viem client
+    const agentConfig = {
+      name: data.agentId ? data.agentId.slice(2, 18) : 'agent', // Use part of agentId as name
+      ens: data.ensName || '',
+      network: networkConfig.name?.toLowerCase().includes('0g') ? 'og_testnet' : 'sepolia',
+      allowedTools: data.skills || ['swap_tokens', 'transfer', 'query'],
+      valueLimit: data.maxTasks || 100,
+      endpoints: '',
+      description: ''
     };
+
+    // Call the actual on-chain registration via viem
+    try {
+      const result = await viem.registerAgentOnchain(agentConfig);
+      return {
+        txHash: result.txHash,
+        tokenId: result.tokenId
+      };
+    } catch (error) {
+      console.error('On-chain registration error:', error);
+      throw new Error(`Contract call failed: ${error.message}`);
+    }
   }
 
   async generateDM3Profile(config, walletClient) {
