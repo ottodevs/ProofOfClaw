@@ -101,7 +101,7 @@ export function registerEpochCommands(program: Command): void {
             )
           );
 
-          let bundleCid: string;
+          let bundleCid: string = "(dry-run — not uploaded)";
 
           if (!opts.dryRun) {
             // Upload epoch bundle to 0G Storage

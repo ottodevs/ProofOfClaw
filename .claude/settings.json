@@ -13,7 +13,15 @@
       "Bash(xargs cat:*)",
       "Bash(ls -la /home/god/ProofOfClaw/ProofOfClaw/contracts/broadcast/*/)",
       "Bash(ls -la /home/god/ProofOfClaw/ProofOfClaw/frontend/*.html)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(ls -lah /home/god/ProofOfClaw/ProofOfClaw/frontend/*.js)",
+      "Bash(wc -l /home/god/ProofOfClaw/ProofOfClaw/frontend/*.html)",
+      "Bash(cargo check:*)",
+      "Bash(forge build:*)",
+      "Bash(grep -n \"@media\" *.html)",
+      "Read(//home/god/ProofOfClaw/**)",
+      "Bash(grep -n \"0G\\\\|0g\\\\|ZeroG\\\\|zero_g\" /home/god/ProofOfClaw/ProofOfClaw/frontend/*.js /home/god/ProofOfClaw/ProofOfClaw/frontend/*.html)",
+      "Bash(node --check frontend/shared.js)"
     ]
   }
 }

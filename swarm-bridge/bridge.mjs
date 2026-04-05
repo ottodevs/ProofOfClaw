@@ -122,6 +122,18 @@ const ensToSwarm = new Map();   // "alice.proofclaw.eth" → { agentId, channelI
 const swarmToEns = new Map();   // "swarm-agent-id" → "alice.proofclaw.eth"
 const channelToEns = new Map(); // "channel-id" → "alice.proofclaw.eth" (for channel messages)
 
+// In-memory channel message buffer for group chat history
+const channelMessages = new Map(); // channelId → [{ from, text, ts }]
+const MAX_CHANNEL_HISTORY = 200;
+
+function bufferChannelMessage(channelId, from, text) {
+  if (!channelId) return;
+  if (!channelMessages.has(channelId)) channelMessages.set(channelId, []);
+  const msgs = channelMessages.get(channelId);
+  msgs.push({ from, text, ts: Date.now() });
+  if (msgs.length > MAX_CHANNEL_HISTORY) msgs.shift();
+}
+
 function loadIdentityMap() {
   // Load from file
   if (existsSync(IDENTITY_MAP_PATH)) {
@@ -457,6 +469,9 @@ async function handleSwarmMessage(data, config, privateKeyPem) {
     case "message": {
       // Channel message from Swarm → forward to DM3
       if (data.from === config.agentName) break; // Skip our own messages
+
+      // Buffer for group chat history
+      bufferChannelMessage(data.channelId, `${data.from}.swarm.proofclaw.eth`, data.text);
 
       // Determine target ENS name
       const targetEns = channelToEns.get(data.channelId) || resolveSwarmSenderToEns(data);
@@ -900,16 +915,105 @@ function startHealthServer() {
       return;
     }
 
+    // --- POST /send-channel-message — send a message to a swarm channel ---
+    // Body: { channelId, text, ensName }
+    if (req.method === "POST" && req.url === "/send-channel-message") {
+      let body = "";
+      req.on("data", (chunk) => { body += chunk; });
+      req.on("end", async () => {
+        try {
+          const { channelId, text, ensName } = JSON.parse(body);
+          if (!channelId || !text || !ensName) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: "channelId, text, and ensName required" }));
+            return;
+          }
+          await sendToSwarmChannel(channelId, text, ensName);
+          bufferChannelMessage(channelId, ensName, text);
+          broadcastToWsClients(channelId, { from: ensName, text, ts: Date.now() });
+          res.writeHead(200);
+          res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      });
+      return;
+    }
+
+    // --- GET /channels/:channelId/messages — get message history for a channel ---
+    const channelMsgMatch = req.method === "GET" && req.url.match(/^\/channels\/([^/]+)\/messages/);
+    if (channelMsgMatch) {
+      const channelId = decodeURIComponent(channelMsgMatch[1]);
+      const messages = channelMessages.get(channelId) || [];
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.end(JSON.stringify({ messages }));
+      return;
+    }
+
     res.writeHead(404);
     res.end(JSON.stringify({ error: "not found" }));
   });
 
+  // --- WebSocket /ws/chat — live group chat for swarm channels ---
+  const wss = new WebSocket.Server({ server, path: "/ws/chat" });
+  wss.on("connection", (ws, req) => {
+    const url = new URL(req.url, `http://localhost:${BRIDGE_PORT}`);
+    const channelId = url.searchParams.get("channelId");
+    const ensName = url.searchParams.get("ensName") || "anonymous";
+
+    ws._chatChannelId = channelId;
+    ws._chatEnsName = ensName;
+
+    log("WS-CHAT", `Connected: ${ensName} on channel ${channelId || "none"}`);
+
+    ws.on("message", async (raw) => {
+      try {
+        const data = JSON.parse(raw.toString());
+        if (data.type === "message" && data.text) {
+          const ch = data.channelId || channelId;
+          const msg = { from: ensName, text: data.text, ts: Date.now() };
+
+          // Buffer locally
+          if (ch) bufferChannelMessage(ch, ensName, data.text);
+
+          // Forward to Swarm hub
+          if (ch) await sendToSwarmChannel(ch, data.text, ensName);
+
+          // Broadcast to all WS clients on this channel (except sender)
+          broadcastToWsClients(ch, msg, ws);
+        }
+      } catch (e) {
+        log("WS-CHAT", `Error: ${e.message}`);
+      }
+    });
+
+    ws.on("close", () => {
+      log("WS-CHAT", `Disconnected: ${ensName}`);
+    });
+  });
+
+  /** Broadcast a message to all WS chat clients on a given channel */
+  function broadcastToWsClients(channelId, msg, excludeWs) {
+    for (const client of wss.clients) {
+      if (client.readyState === WebSocket.OPEN && client._chatChannelId === channelId && client !== excludeWs) {
+        client.send(JSON.stringify(msg));
+      }
+    }
+  }
+
   server.listen(BRIDGE_PORT, () => {
     log("HTTP", `Bridge API on http://localhost:${BRIDGE_PORT}`);
-    log("HTTP", `  GET  /health          — status + setup state`);
-    log("HTTP", `  POST /setup           — onboard: { orgId, agentName? }`);
-    log("HTTP", `  GET  /mappings        — identity mappings`);
-    log("HTTP", `  POST /register-agent  — map ENS ↔ Swarm agent`);
+    log("HTTP", `  GET  /health                         — status + setup state`);
+    log("HTTP", `  POST /setup                          — onboard: { orgId, agentName? }`);
+    log("HTTP", `  GET  /mappings                       — identity mappings`);
+    log("HTTP", `  POST /register-agent                 — map ENS ↔ Swarm agent`);
+    log("HTTP", `  POST /send-channel-message           — send message to channel`);
+    log("HTTP", `  GET  /channels/:id/messages           — channel message history`);
+    log("HTTP", `  WS   /ws/chat?channelId=&ensName=    — live group chat`);
   });
 }
 

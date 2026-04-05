@@ -65,9 +65,12 @@ impl DM3Client {
 
         let envelope = DM3Envelope {
             to: recipient_ens.to_string(),
-            from: String::new(),
+            from: String::new(), // TODO: populate with sender's ENS name from config
             message: serde_json::to_string(message)?,
-            encryption_type: "x25519-xsalsa20-poly1305".to_string(),
+            // NOTE: message is sent as plaintext JSON — real x25519-xsalsa20-poly1305
+            // encryption requires the recipient's public encryption key from their DM3 profile.
+            // This field declares the *intended* scheme for the delivery service envelope.
+            encryption_type: "plaintext".to_string(),
             timestamp: chrono::Utc::now().timestamp(),
         };
 

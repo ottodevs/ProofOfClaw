@@ -19,10 +19,6 @@ pub struct AgentConfig {
     pub zero_g_compute_endpoint: String,
     /// DM3 delivery service URL for encrypted messaging.
     pub dm3_delivery_service_url: String,
-    /// Ledger origin token (ERC-7730 clear-signing). Optional.
-    pub ledger_origin_token: Option<String>,
-    /// USB HID device path for the Ledger device. Optional — auto-detected if omitted.
-    pub ledger_device_path: Option<String>,
     /// Address of the deployed ProofOfClawVerifier contract (for EIP-712 domain).
     pub verifier_contract_address: Option<String>,
     /// Chain ID for EIP-712 domain (defaults to 11155111 / Sepolia).
@@ -100,8 +96,6 @@ impl AgentConfig {
             zero_g_indexer_rpc: env_required("ZERO_G_INDEXER_RPC")?,
             zero_g_compute_endpoint: env_required("ZERO_G_COMPUTE_ENDPOINT")?,
             dm3_delivery_service_url: env_required("DM3_DELIVERY_SERVICE_URL")?,
-            ledger_origin_token: env_opt("LEDGER_ORIGIN_TOKEN"),
-            ledger_device_path: env_opt("LEDGER_DEVICE_PATH"),
             verifier_contract_address: env_address("VERIFIER_CONTRACT_ADDRESS"),
             chain_id: env_opt("CHAIN_ID").and_then(|v| v.parse().ok()),
             eip8004_identity_registry: env_address("EIP8004_IDENTITY_REGISTRY"),

@@ -397,11 +397,17 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
 /* ======================================== */
 @media (max-width: 768px) {
   :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-100%); z-index: 300; }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .mobile-menu-btn { display: flex; }
   .topbar { left: 0; padding: 0 1rem; }
   .main-content { margin-left: 0; padding: 1.25rem 1rem; }
   .metrics-grid { grid-template-columns: 1fr; }
   .agent-header { flex-direction: column; }
   .agent-header-right { align-items: flex-start; }
+  .topbar-right { flex-wrap: wrap; gap: 0.5rem; }
+  .status-badge { font-size: 0.6rem; padding: 0.2rem 0.5rem; }
+  .ethglobal-badge { display: none; }
 }
 
 @media (max-width: 480px) {
@@ -409,6 +415,7 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   .main-content { margin-top: 52px; padding: 1rem 0.75rem; }
   .topbar-title { font-size: 0.9rem; }
   .agent-selector { font-size: 0.7rem; padding: 0.3rem 0.5rem; min-width: 140px; max-width: 180px; }
+  .status-badge { display: none; }
 }
 
 /* ======================================== */
@@ -438,6 +445,196 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
 @keyframes pulse-live {
   0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--green); }
   50% { opacity: 0.5; box-shadow: 0 0 3px var(--green); }
+}
+
+/* ======================================== */
+/* MY iNFTs GALLERY                        */
+/* ======================================== */
+.infts-section {
+  margin-bottom: 1.75rem;
+}
+
+.infts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.infts-header .section-title { margin-bottom: 0; }
+
+.infts-count {
+  background: var(--cyan-glow);
+  color: var(--cyan);
+  padding: 0.15rem 0.6rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.infts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.inft-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.inft-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan), var(--purple));
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.inft-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-cyan);
+  transform: translateY(-1px);
+}
+
+.inft-card:hover::before { opacity: 1; }
+
+.inft-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.inft-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--cyan-glow);
+  border: 1px solid var(--border-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  color: var(--cyan);
+}
+
+.inft-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.inft-card-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inft-card-ens {
+  font-size: 0.72rem;
+  color: var(--cyan);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inft-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.inft-status-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.inft-status-dot.inactive { background: var(--text-dim); }
+
+.inft-card-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.75rem;
+  font-size: 0.72rem;
+}
+
+.inft-detail-label {
+  color: var(--text-dim);
+}
+
+.inft-detail-value {
+  color: var(--text-secondary);
+  text-align: right;
+  font-weight: 500;
+}
+
+.inft-detail-value.hash { color: var(--cyan); font-size: 0.68rem; }
+
+.infts-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.infts-loading .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.infts-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.infts-error {
+  padding: 1rem;
+  background: rgba(255, 61, 90, 0.06);
+  border: 1px solid rgba(255, 61, 90, 0.2);
+  border-radius: 6px;
+  color: var(--red);
+  font-size: 0.8rem;
+}
+
+.infts-refresh-btn {
+  background: transparent;
+  border: 1px solid var(--border-cyan);
+  color: var(--cyan);
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.infts-refresh-btn:hover {
+  background: var(--cyan-glow);
 }
 
 /* Connection error banner */
@@ -645,6 +842,20 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
         <span class="metric-label">Provider</span>
         <span class="metric-value">Boundless</span>
       </div>
+    </div>
+  </div>
+
+  <!-- My iNFTs -->
+  <div class="infts-section" id="infts-section" style="display:none;">
+    <div class="infts-header">
+      <div class="section-title">My iNFTs</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span class="infts-count" id="infts-count">0</span>
+        <button class="infts-refresh-btn" onclick="loadWalletINFTs()" title="Refresh">Refresh</button>
+      </div>
+    </div>
+    <div id="infts-content">
+      <div class="infts-empty">Connect your wallet to view your minted iNFTs</div>
     </div>
   </div>
 
@@ -1494,6 +1705,145 @@ function runSetupChecklist() {
 
 // Run checklist after short delay to let other init run first
 setTimeout(runSetupChecklist, 500);
+
+// =====================================================
+// MY iNFTs
+// =====================================================
+let walletINFTs = [];
+
+function showINFTsSection(visible) {
+  var section = document.getElementById('infts-section');
+  if (section) section.style.display = visible ? 'block' : 'none';
+}
+
+async function loadWalletINFTs() {
+  if (typeof PocViem === 'undefined') {
+    // Module not ready yet — retry after a short delay
+    setTimeout(loadWalletINFTs, 500);
+    return;
+  }
+
+  var state = PocViem.getWalletState();
+  if (!state.connected || !state.address) {
+    showINFTsSection(false);
+    return;
+  }
+
+  showINFTsSection(true);
+  var content = document.getElementById('infts-content');
+  content.innerHTML = '<div class="infts-loading"><div class="spinner"></div>Fetching iNFTs from chain...</div>';
+
+  try {
+    var network = detectCurrentNetwork();
+    PocViem.init(network);
+    walletINFTs = await PocViem.getWalletINFTs(state.address, network);
+    renderINFTs(walletINFTs);
+  } catch (e) {
+    console.error('Failed to load wallet iNFTs:', e);
+    content.innerHTML = '<div class="infts-error">Failed to load iNFTs: ' + esc(e.message) + '</div>';
+  }
+}
+
+function detectCurrentNetwork() {
+  // Check what chain the wallet is connected to
+  if (window.ethereum && window.ethereum.chainId) {
+    var cid = parseInt(window.ethereum.chainId, 16);
+    if (cid === 16602) return 'og_testnet';
+    if (cid === 16661) return 'og_mainnet';
+    if (cid === 11155111) return 'sepolia';
+  }
+  return 'sepolia';
+}
+
+function renderINFTs(infts) {
+  var content = document.getElementById('infts-content');
+  var countEl = document.getElementById('infts-count');
+  countEl.textContent = infts.length;
+
+  if (infts.length === 0) {
+    content.innerHTML = '<div class="infts-empty">No iNFTs found in this wallet. <a href="agents.html" style="color:var(--cyan);">Mint your first agent</a></div>';
+    return;
+  }
+
+  var html = '<div class="infts-grid">';
+  for (var i = 0; i < infts.length; i++) {
+    var nft = infts[i];
+    var ensDisplay = nft.ensName || 'unnamed';
+    var nameDisplay = ensDisplay.split('.')[0] || 'Agent #' + nft.tokenId;
+    var mintDate = new Date(nft.mintedAt);
+    var mintStr = mintDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    var policyShort = nft.policyHash ? (nft.policyHash.slice(0, 6) + '...' + nft.policyHash.slice(-4)) : '---';
+    var agentIdShort = nft.agentId ? (nft.agentId.slice(0, 6) + '...' + nft.agentId.slice(-4)) : '---';
+
+    html += '<div class="inft-card" onclick="navigateToINFT(\'' + esc(nameDisplay) + '\')">' +
+      '<div class="inft-card-top">' +
+        '<div class="inft-avatar">' + getAgentIcon(nameDisplay) + '</div>' +
+        '<div class="inft-card-info">' +
+          '<div class="inft-card-name">' + esc(nameDisplay) + '</div>' +
+          '<div class="inft-card-ens">' + esc(ensDisplay) + '</div>' +
+        '</div>' +
+        '<div class="inft-status-dot ' + (nft.active ? 'active' : 'inactive') + '" title="' + (nft.active ? 'Active' : 'Inactive') + '"></div>' +
+      '</div>' +
+      '<div class="inft-card-details">' +
+        '<span class="inft-detail-label">Token ID</span>' +
+        '<span class="inft-detail-value">#' + esc(nft.tokenId) + '</span>' +
+        '<span class="inft-detail-label">Reputation</span>' +
+        '<span class="inft-detail-value">' + esc(nft.reputationScore) + '</span>' +
+        '<span class="inft-detail-label">Proofs</span>' +
+        '<span class="inft-detail-value">' + esc(nft.totalProofs) + '</span>' +
+        '<span class="inft-detail-label">Minted</span>' +
+        '<span class="inft-detail-value">' + esc(mintStr) + '</span>' +
+        '<span class="inft-detail-label">Policy</span>' +
+        '<span class="inft-detail-value hash">' + esc(policyShort) + '</span>' +
+        '<span class="inft-detail-label">Agent ID</span>' +
+        '<span class="inft-detail-value hash">' + esc(agentIdShort) + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+  html += '</div>';
+  content.innerHTML = html;
+}
+
+function getAgentIcon(name) {
+  var n = name.toLowerCase();
+  if (n.includes('defi') || n.includes('yield') || n.includes('swap')) return '\u{1F4B0}';
+  if (n.includes('sec') || n.includes('audit') || n.includes('guard')) return '\u{1F6E1}';
+  if (n.includes('gov') || n.includes('dao') || n.includes('vote')) return '\u{1F3DB}';
+  if (n.includes('data') || n.includes('oracle') || n.includes('analytics')) return '\u{1F4CA}';
+  if (n.includes('msg') || n.includes('chat') || n.includes('comms')) return '\u{1F4E8}';
+  return '\u{2726}';
+}
+
+function navigateToINFT(agentName) {
+  // Try to find matching agent in local state, otherwise go to agents page
+  var match = agents.find(function(a) { return a.name === agentName || a.id === agentName; });
+  if (match) {
+    window.location.href = 'dashboard.html?agent=' + encodeURIComponent(match.id);
+  } else {
+    window.location.href = 'agents.html';
+  }
+}
+
+// Watch for wallet connection and auto-load iNFTs
+// Poll until wallet display becomes visible (set by wallet.js on connect)
+var _inftWalletPoll = setInterval(function() {
+  var display = document.getElementById('wallet-display');
+  if (display && display.style.display === 'flex') {
+    clearInterval(_inftWalletPoll);
+    loadWalletINFTs();
+  }
+}, 800);
+
+// Also listen for account changes
+if (window.ethereum) {
+  window.ethereum.on('accountsChanged', function(accounts) {
+    if (accounts.length > 0) {
+      setTimeout(loadWalletINFTs, 500);
+    } else {
+      showINFTsSection(false);
+    }
+  });
+}
 
 // =====================================================
 // BOOT

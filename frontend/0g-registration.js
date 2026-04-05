@@ -142,11 +142,16 @@ export class AgentRegistrationManager {
       const network = config.network.includes('mainnet') ? 'mainnet' : config.network.includes('sepolia') ? 'sepolia' : 'testnet';
       const zeroGConfig = ZERO_G_CONFIG[network];
 
+      // Guard: reject mainnet until contracts are deployed
+      if (!zeroGConfig.contracts) {
+        throw new Error(`Contracts not yet deployed on ${network}. Use sepolia or testnet.`);
+      }
+
       // Generate agent ID
-      const agentId = this.generateAgentId(config.agentName || config.name);
-      
+      const agentId = await this.generateAgentId(config.agentName || config.name);
+
       // Generate policy hash
-      const policyHash = this.generatePolicyHash(config);
+      const policyHash = await this.generatePolicyHash(config);
       
       // Get RISC Zero image ID from network config
       const riscZeroImageId = this.generateImageId(config);
@@ -319,14 +324,12 @@ export class AgentRegistrationManager {
   }
 
   /**
-   * Hash content using SHA-256 (browser SubtleCrypto)
+   * Hash content using keccak256 (matches on-chain keccak256 used in Solidity)
    */
   async hashContent(content) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(content);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // Use keccak256 via ethers to match Solidity's keccak256()
+    const { keccak256, toUtf8Bytes } = await import('https://esm.sh/ethers@6.13.4');
+    return keccak256(toUtf8Bytes(content));
   }
 
   /**
@@ -418,11 +421,11 @@ export class AgentRegistrationManager {
     const sanitized = { ...metadata, privateKey: undefined, secrets: undefined };
     const plaintext = new TextEncoder().encode(JSON.stringify(sanitized));
 
-    // Derive a symmetric key from the wallet address (owner can always decrypt)
-    const walletAddr = config.walletAddress || config.ensName || 'proof-of-claw';
+    // Derive a symmetric key from a wallet signature (only the key holder can reproduce)
+    const sigBytes = await this.getEncryptionKeyMaterial(config);
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode(walletAddr),
+      sigBytes,
       'PBKDF2',
       false,
       ['deriveKey']
@@ -446,6 +449,34 @@ export class AgentRegistrationManager {
     packed.set(new Uint8Array(ciphertext), salt.length + iv.length);
 
     return packed;
+  }
+
+  /**
+   * Derive encryption key material from a deterministic wallet signature.
+   * The user signs a fixed message — only the private key holder can reproduce this,
+   * unlike the wallet address which is public.
+   */
+  async getEncryptionKeyMaterial(config) {
+    if (this._cachedKeyMaterial) return this._cachedKeyMaterial;
+
+    const message = `ProofOfClaw encryption key for ${config.walletAddress || 'agent'}`;
+
+    if (window.ethereum) {
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const sig = await signer.signMessage(message);
+      // Use the signature bytes (not hex) as PBKDF2 input
+      const sigBytes = new TextEncoder().encode(sig);
+      this._cachedKeyMaterial = sigBytes;
+      return sigBytes;
+    }
+
+    // Fallback for environments without a wallet (e.g. tests) — derive from config secret
+    const fallback = config.encryptionSecret || config.walletAddress || 'proof-of-claw';
+    console.warn('No wallet available for encryption key derivation — using fallback. Data will NOT be securely encrypted.');
+    const bytes = new TextEncoder().encode(fallback);
+    this._cachedKeyMaterial = bytes;
+    return bytes;
   }
 
   /**
@@ -569,34 +600,22 @@ export class AgentRegistrationManager {
     };
   }
 
-  generateAgentId(name) {
-    // Generate deterministic agent ID from name + timestamp
-    const data = `${name.toLowerCase().trim()}_${Date.now()}`;
-    let hash = 0;
-    for (let i = 0; i < data.length; i++) {
-      const char = data.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return '0x' + Math.abs(hash).toString(16).padStart(64, '0');
+  async generateAgentId(name) {
+    // Generate deterministic agent ID using keccak256 — matches contract and viem-client
+    const { keccak256, toUtf8Bytes } = await import('https://esm.sh/ethers@6.13.4');
+    return keccak256(toUtf8Bytes(name.toLowerCase().trim()));
   }
 
-  generatePolicyHash(config) {
-    // Generate hash from policy configuration
+  async generatePolicyHash(config) {
+    // Generate policy hash using keccak256 — matches contract and viem-client
+    const { keccak256, toUtf8Bytes } = await import('https://esm.sh/ethers@6.13.4');
     const policyData = JSON.stringify({
       tools: config.allowedTools || config.tools || [],
       valueLimit: config.valueLimit,
       endpoints: config.endpoints || [],
       network: config.network
     });
-    
-    let hash = 0;
-    for (let i = 0; i < policyData.length; i++) {
-      const char = policyData.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return '0x' + Math.abs(hash).toString(16).padStart(64, '0');
+    return keccak256(toUtf8Bytes(policyData));
   }
 
   generateImageId(config) {

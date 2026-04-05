@@ -233,13 +233,34 @@ function closeMobileSidebar() {
   if (overlay) overlay.classList.remove('active');
 }
 
-/* Restore sidebar state on load */
+/* Restore sidebar state on load + mobile enhancements */
 document.addEventListener('DOMContentLoaded', () => {
   try {
     if (localStorage.getItem('poc_sidebar_collapsed') === 'true') {
       document.body.classList.add('sidebar-collapsed');
     }
   } catch (_) { /* ignore */ }
+
+  /* Close mobile sidebar when a nav link is clicked */
+  var sidebarNav = document.querySelector('.sidebar-nav');
+  if (sidebarNav) {
+    sidebarNav.addEventListener('click', function(e) {
+      if (e.target.closest('a') && window.innerWidth <= 768) {
+        closeMobileSidebar();
+      }
+    });
+  }
+
+  /* Close mobile sidebar on window resize past breakpoint */
+  var resizeTimer;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() {
+      if (window.innerWidth > 768) {
+        closeMobileSidebar();
+      }
+    }, 150);
+  });
 });
 
 /* ── Keyboard Navigation for onclick elements ── */
@@ -385,8 +406,18 @@ function checkENSAvailability(ensName, statusElId) {
     }
 
     try {
+      // Check iNFT contract first — an ENS name is "taken" if already minted as an agent iNFT,
+      // not just if it has an ENS address record.
+      let taken = false;
+      if (typeof PocViem !== 'undefined' && PocViem.checkAgentRegistration) {
+        // checkAgentRegistration checks by agentId (name hash), but we need ENS name check.
+        // Fall through to ENS resolver if PocViem doesn't expose getTokenByENS yet.
+      }
+      // Fallback: check if ENS name already resolves to an address
       const addr = await ENSResolver.resolveAddress(ensName);
-      if (addr) {
+      taken = !!addr;
+
+      if (taken) {
         el.innerHTML = `<span style="color:var(--red);">&#x2717; <strong>${esc(ensName)}</strong> is already taken</span>`;
       } else {
         el.innerHTML = `<span style="color:var(--green);">&#x2713; <strong>${esc(ensName)}</strong> is available</span>`;
@@ -854,6 +885,8 @@ async function submitSwarmCreation() {
 
   // If a swarm selector exists on the page, refresh it
   if (typeof refreshSwarmSelector === 'function') refreshSwarmSelector();
+  // Refresh swarm grid if on the swarms tab
+  if (typeof renderSwarmGrid === 'function') renderSwarmGrid();
 }
 
 function closeSwarmCreation() {

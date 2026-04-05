@@ -1515,7 +1515,419 @@
   color: var(--cyan);
 }
 
-/* ─── SCROLLBAR ─── */
+/* ─── MAIN TAB BAR ─── */
+.main-tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+.main-tab-btn {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  top: 1px;
+}
+.main-tab-btn:hover { color: var(--text-primary); }
+.main-tab-btn.active {
+  color: var(--cyan);
+  border-bottom-color: var(--cyan);
+}
+.main-tab-btn[data-tab="swarms"].active {
+  color: var(--purple);
+  border-bottom-color: var(--purple);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ─── SWARM GRID ─── */
+.swarm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+.swarm-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+}
+.swarm-card:hover {
+  border-color: rgba(187,134,252,0.4);
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(187,134,252,0.1);
+}
+.swarm-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.swarm-icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(187,134,252,0.08);
+  border: 1px solid rgba(187,134,252,0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--purple);
+  flex-shrink: 0;
+}
+.swarm-info { flex: 1; min-width: 0; }
+.swarm-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.swarm-ens {
+  font-size: 11px;
+  color: rgba(187,134,252,0.7);
+  font-family: var(--font-mono);
+}
+.swarm-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.swarm-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.swarm-agent-count {
+  color: var(--purple);
+  font-weight: 600;
+}
+.swarm-channel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(187,134,252,0.08);
+  border: 1px solid rgba(187,134,252,0.15);
+  border-radius: 12px;
+  font-size: 10px;
+  color: rgba(187,134,252,0.7);
+}
+
+/* ─── SWARM DETAIL ─── */
+.swarm-detail-panel {
+  animation: chatMsgIn 0.25s ease;
+}
+.swarm-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 20px;
+}
+.swarm-detail-back:hover {
+  border-color: var(--purple);
+  color: var(--purple);
+}
+.swarm-detail-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+.swarm-detail-hero .swarm-icon {
+  width: 64px;
+  height: 64px;
+  font-size: 28px;
+}
+.swarm-detail-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.btn-swarm-chat {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #bb86fc, #9c27b0);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.btn-swarm-chat:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(187,134,252,0.3);
+}
+.swarm-section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+.swarm-agent-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+.swarm-agent-item:hover {
+  border-color: var(--border-cyan);
+}
+.swarm-agent-item .agent-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+.swarm-agent-item .agent-info { flex: 1; min-width: 0; }
+.swarm-agent-item .agent-name { font-size: 13px; }
+.swarm-agent-item .agent-ens { font-size: 10px; }
+.btn-assign, .btn-remove {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid;
+}
+.btn-assign {
+  background: rgba(187,134,252,0.08);
+  border-color: rgba(187,134,252,0.3);
+  color: var(--purple);
+}
+.btn-assign:hover {
+  background: rgba(187,134,252,0.15);
+  border-color: var(--purple);
+}
+.btn-remove {
+  background: rgba(255,61,90,0.06);
+  border-color: rgba(255,61,90,0.2);
+  color: var(--red, #ff3d5a);
+}
+.btn-remove:hover {
+  background: rgba(255,61,90,0.12);
+  border-color: var(--red, #ff3d5a);
+}
+
+/* ─── SWARM GROUP CHAT ─── */
+.swarm-chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 24px;
+}
+.swarm-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: rgba(6,8,13,0.85);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.swarm-chat-header h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin: 0;
+}
+.swarm-chat-members {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.swarm-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.swarm-chat-msg {
+  max-width: 80%;
+  display: flex;
+  flex-direction: column;
+  animation: chatMsgIn 0.25s ease;
+}
+.swarm-chat-msg.self { align-self: flex-end; }
+.swarm-chat-msg.other { align-self: flex-start; }
+.swarm-chat-sender {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--purple);
+  margin-bottom: 3px;
+  padding: 0 4px;
+}
+.swarm-chat-msg.self .chat-msg-bubble {
+  background: rgba(0,229,255,0.08);
+  border: 1px solid var(--border-cyan);
+  color: var(--text-primary);
+  border-bottom-right-radius: 4px;
+}
+.swarm-chat-msg.other .chat-msg-bubble {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+}
+.swarm-chat-compose {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+.swarm-chat-compose textarea {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  resize: none;
+  outline: none;
+  min-height: 20px;
+  max-height: 80px;
+}
+.swarm-chat-compose textarea:focus {
+  border-color: rgba(187,134,252,0.4);
+}
+.swarm-chat-send {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #bb86fc, #9c27b0);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.swarm-chat-send:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(187,134,252,0.3);
+}
+.swarm-chat-system {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 8px;
+}
+.swarm-chat-offline {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+  padding: 40px;
+}
+.swarm-chat-offline .offline-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+/* ─── SWARM EMPTY STATE ─── */
+.swarm-empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-dim);
+}
+.swarm-empty-state .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+  color: var(--purple);
+}
+.swarm-empty-state h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.swarm-empty-state p {
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+.btn-create-swarm {
+  display: inline-block;
+  padding: 12px 28px;
+  background: linear-gradient(135deg, #bb86fc, #9c27b0);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.btn-create-swarm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(187,134,252,0.3);
+}
+
+/* ──�� SCROLLBAR ─── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-primary); }
 ::-webkit-scrollbar-thumb { background: var(--text-dim); border-radius: 3px; }
@@ -1529,10 +1941,15 @@
   .topbar { left: 0; padding: 0 16px; }
   .main-content { margin-left: 0; padding: 20px 16px; }
   .agent-grid { grid-template-columns: 1fr; }
+  .swarm-grid { grid-template-columns: 1fr; }
   .type-grid { grid-template-columns: 1fr; }
+  .swarm-detail-hero { flex-direction: column; text-align: center; }
+  .swarm-detail-actions { margin-left: 0; justify-content: center; }
   .form-row { grid-template-columns: 1fr; }
   .profile-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .chat-drawer { width: 100vw; right: -100vw; }
+  .chat-drawer.open { right: 0; }
+  .chat-drawer-grid { grid-template-columns: repeat(2, 1fr); }
   .toolbar { gap: 8px; }
   .btn-new-agent-top { font-size: 11px; padding: 6px 10px; }
 }
@@ -1544,8 +1961,11 @@
   .topbar-title { font-size: 16px; }
   .agent-card { padding: 16px; }
   .profile-stats-grid { grid-template-columns: 1fr 1fr; }
+  .chat-drawer-grid { grid-template-columns: 1fr; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .search-box { min-width: 100%; }
+  .topbar-right { gap: 6px; }
+  .topbar-right .badge, .topbar-right .ethglobal-badge { display: none; }
 }
 </style>
 </head>
@@ -1615,63 +2035,102 @@
 <!-- ═══════ MAIN CONTENT ═══════ -->
 <main class="main-content" role="main">
 
-  <!-- Toolbar -->
-  <div class="toolbar" id="toolbar" style="display:none;">
-    <div class="search-box">
-      <input type="text" id="search-input" placeholder="Search agents by name, type, or ENS..." aria-label="Search agents">
-    </div>
-    <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
-    <button class="filter-btn" data-filter="online" onclick="setFilter('online', this)">Online</button>
-    <button class="filter-btn" data-filter="busy" onclick="setFilter('busy', this)">Busy</button>
-    <button class="filter-btn" data-filter="offline" onclick="setFilter('offline', this)">Offline</button>
-    <div class="register-dropdown" style="position:relative;">
-      <a href="#" class="btn-new-agent-top" style="background:linear-gradient(135deg,var(--cyan),#00b8d4);color:#000;font-weight:700;" onmouseenter="showRegisterMenu()" onclick="event.preventDefault();showRegisterMenu();">Register Agent &#x25BE;</a>
-      <div id="register-menu" class="register-menu" onmouseleave="hideRegisterMenu()">
-        <div class="register-menu-item" onclick="hideRegisterMenu();openWizard();" style="cursor:pointer;">
-          <span class="register-menu-icon" style="color:#bb86fc;">&#x2B23;</span>
-          <div>
-            <div class="register-menu-title">Register Identity</div>
-            <div class="register-menu-desc">Claim on-chain identity (ENS, policy, iNFT)</div>
+  <!-- Tab Bar -->
+  <div class="main-tab-bar" id="main-tab-bar">
+    <button class="main-tab-btn active" data-tab="agents" onclick="switchMainTab('agents', this)">Agents</button>
+    <button class="main-tab-btn" data-tab="swarms" onclick="switchMainTab('swarms', this)">Swarms</button>
+  </div>
+
+  <!-- ═══ AGENTS TAB ═══ -->
+  <div class="tab-panel active" id="tab-agents">
+    <!-- Toolbar -->
+    <div class="toolbar" id="toolbar" style="display:none;">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Search agents by name, type, or ENS..." aria-label="Search agents">
+      </div>
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+      <button class="filter-btn" data-filter="online" onclick="setFilter('online', this)">Online</button>
+      <button class="filter-btn" data-filter="busy" onclick="setFilter('busy', this)">Busy</button>
+      <button class="filter-btn" data-filter="offline" onclick="setFilter('offline', this)">Offline</button>
+      <div class="register-dropdown" style="position:relative;">
+        <a href="#" class="btn-new-agent-top" style="background:linear-gradient(135deg,var(--cyan),#00b8d4);color:#000;font-weight:700;" onmouseenter="showRegisterMenu()" onclick="event.preventDefault();showRegisterMenu();">Register Agent &#x25BE;</a>
+        <div id="register-menu" class="register-menu" onmouseleave="hideRegisterMenu()">
+          <div class="register-menu-item" onclick="hideRegisterMenu();openWizard();" style="cursor:pointer;">
+            <span class="register-menu-icon" style="color:#bb86fc;">&#x2B23;</span>
+            <div>
+              <div class="register-menu-title">Register Identity</div>
+              <div class="register-menu-desc">Claim on-chain identity (ENS, policy, iNFT)</div>
+            </div>
           </div>
-        </div>
-        <div class="register-menu-item" onclick="hideRegisterMenu();openConnectModal();" style="cursor:pointer;">
-          <span class="register-menu-icon" style="color:var(--green);">&#x1F50C;</span>
-          <div>
-            <div class="register-menu-title">Connect Existing Agent</div>
-            <div class="register-menu-desc">Link a running agent (any framework)</div>
+          <div class="register-menu-item" onclick="hideRegisterMenu();openConnectModal();" style="cursor:pointer;">
+            <span class="register-menu-icon" style="color:var(--green);">&#x1F50C;</span>
+            <div>
+              <div class="register-menu-title">Connect Existing Agent</div>
+              <div class="register-menu-desc">Link a running agent (any framework)</div>
+            </div>
           </div>
-        </div>
-        <div class="register-menu-item" onclick="hideRegisterMenu();openWizard();" style="cursor:pointer;">
-          <span class="register-menu-icon" style="color:var(--cyan);">&#x2699;</span>
-          <div>
-            <div class="register-menu-title">Deploy IronClaw</div>
-            <div class="register-menu-desc">Full Rust/IronClaw agent deployment</div>
+          <div class="register-menu-item" onclick="hideRegisterMenu();openWizard();" style="cursor:pointer;">
+            <span class="register-menu-icon" style="color:var(--cyan);">&#x2699;</span>
+            <div>
+              <div class="register-menu-title">Deploy IronClaw</div>
+              <div class="register-menu-desc">Full Rust/IronClaw agent deployment</div>
+            </div>
           </div>
-        </div>
-        <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
-        <div class="register-menu-item" onclick="hideRegisterMenu();showSwarmCreation();" style="cursor:pointer;">
-          <span class="register-menu-icon" style="color:var(--amber);">&#x2B21;</span>
-          <div>
-            <div class="register-menu-title">Create Swarm</div>
-            <div class="register-menu-desc">Add a new team to your organization</div>
+          <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
+          <div class="register-menu-item" onclick="hideRegisterMenu();showSwarmCreation();" style="cursor:pointer;">
+            <span class="register-menu-icon" style="color:var(--amber);">&#x2B21;</span>
+            <div>
+              <div class="register-menu-title">Create Swarm</div>
+              <div class="register-menu-desc">Add a new team to your organization</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Agent Grid -->
+    <div class="agent-grid" id="agent-grid"></div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="empty-state" style="display:none;">
+      <div class="empty-icon">&#x27C1;</div>
+      <h2>No agents yet</h2>
+      <p>Register an agent to get started, then connect or deploy it.</p>
+      <button class="btn-deploy-first" onclick="openWizard()" style="display:inline-block;margin-top:20px;cursor:pointer;">Register Agent</button>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
+        <button class="btn-deploy-first" onclick="openConnectModal()" style="background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);color:var(--green);font-size:12px;padding:8px 20px;">Connect Existing Agent</button>
+        <button class="btn-deploy-first" onclick="openWizard()" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);color:var(--cyan);font-size:12px;padding:8px 20px;">Deploy IronClaw</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Agent Grid -->
-  <div class="agent-grid" id="agent-grid"></div>
+  <!-- ═══ SWARMS TAB ═══ -->
+  <div class="tab-panel" id="tab-swarms">
+    <!-- Swarm Toolbar -->
+    <div class="toolbar" id="swarm-toolbar">
+      <div class="search-box">
+        <input type="text" id="swarm-search-input" placeholder="Search swarms by name or ENS..." aria-label="Search swarms" oninput="renderSwarmGrid()">
+      </div>
+      <button class="btn-new-agent-top" style="background:linear-gradient(135deg,#bb86fc,#9c27b0);color:#fff;" onclick="showSwarmCreation()">+ Create Swarm</button>
+    </div>
 
-  <!-- Empty State -->
-  <div class="empty-state" id="empty-state" style="display:none;">
-    <div class="empty-icon">&#x27C1;</div>
-    <h2>No agents yet</h2>
-    <p>Register an agent to get started, then connect or deploy it.</p>
-    <button class="btn-deploy-first" onclick="openWizard()" style="display:inline-block;margin-top:20px;cursor:pointer;">Register Agent</button>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
-      <button class="btn-deploy-first" onclick="openConnectModal()" style="background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);color:var(--green);font-size:12px;padding:8px 20px;">Connect Existing Agent</button>
-      <button class="btn-deploy-first" onclick="openWizard()" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);color:var(--cyan);font-size:12px;padding:8px 20px;">Deploy IronClaw</button>
+    <!-- Swarm Grid -->
+    <div class="swarm-grid" id="swarm-grid"></div>
+
+    <!-- Swarm Empty State -->
+    <div class="swarm-empty-state" id="swarm-empty-state" style="display:none;">
+      <div class="empty-icon">&#x2B21;</div>
+      <h2>No swarms yet</h2>
+      <p>Create a swarm to organize agents into teams with group messaging.</p>
+      <button class="btn-create-swarm" onclick="showSwarmCreation()">+ Create Swarm</button>
+    </div>
+
+    <!-- Swarm Detail (shown when drilling into a swarm) -->
+    <div class="swarm-detail-panel" id="swarm-detail" style="display:none;">
+      <button class="swarm-detail-back" onclick="closeSwarmDetail()">&#x2190; Back to Swarms</button>
+      <div id="swarm-detail-header"></div>
+      <div id="swarm-detail-agents"></div>
+      <div id="swarm-detail-chat"></div>
     </div>
   </div>
 
@@ -2280,6 +2739,379 @@ function setFilter(filter, el) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   renderAgents();
+}
+
+// ═══════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════
+
+function switchMainTab(tabId, btnEl) {
+  document.querySelectorAll('.main-tab-btn').forEach(b => b.classList.remove('active'));
+  btnEl.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('tab-' + tabId);
+  if (panel) panel.classList.add('active');
+  if (tabId === 'swarms') renderSwarmGrid();
+}
+
+// ═══════════════════════════════════════
+// SWARM GRID RENDERING
+// ═══════════════════════════════════════
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  return days + 'd ago';
+}
+
+function renderSwarmGrid() {
+  const grid = document.getElementById('swarm-grid');
+  const empty = document.getElementById('swarm-empty-state');
+  const toolbar = document.getElementById('swarm-toolbar');
+  const detail = document.getElementById('swarm-detail');
+  const swarms = getSwarms();
+  const query = (document.getElementById('swarm-search-input')?.value || '').toLowerCase();
+
+  // If detail view is open, don't touch the grid
+  if (detail && detail.style.display !== 'none') return;
+
+  const filtered = swarms.filter(s => {
+    if (!query) return true;
+    return s.name.toLowerCase().includes(query) ||
+           (s.ens || '').toLowerCase().includes(query) ||
+           (s.description || '').toLowerCase().includes(query);
+  });
+
+  if (swarms.length === 0) {
+    grid.style.display = 'none';
+    toolbar.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  toolbar.style.display = 'flex';
+  empty.style.display = 'none';
+
+  if (filtered.length === 0) {
+    grid.style.display = 'grid';
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-dim);">No swarms match your search.</div>';
+    return;
+  }
+
+  grid.style.display = 'grid';
+  grid.innerHTML = filtered.map(s => {
+    const agentCount = agents.filter(a => a.swarmId === s.id).length;
+    return `
+    <div class="swarm-card" onclick="openSwarmDetail('${esc(s.id)}')">
+      <div class="swarm-card-header">
+        <div class="swarm-icon">&#x2B21;</div>
+        <div class="swarm-info">
+          <div class="swarm-name">${esc(s.name)}</div>
+          <div class="swarm-ens">${esc(s.ens || '')}</div>
+        </div>
+      </div>
+      <div class="swarm-desc">${esc(s.description || 'No description')}</div>
+      <div class="swarm-meta">
+        <span class="swarm-agent-count">${agentCount} agent${agentCount !== 1 ? 's' : ''}</span>
+        ${s.channelId ? '<span class="swarm-channel-badge">&#x1F4AC; Channel Active</span>' : ''}
+        <span>${timeAgo(s.createdAt)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// SWARM DETAIL VIEW
+// ═══════════════════════════════════════
+
+let activeSwarmId = null;
+
+function openSwarmDetail(swarmId) {
+  const swarm = getSwarmById(swarmId);
+  if (!swarm) return;
+  activeSwarmId = swarmId;
+
+  document.getElementById('swarm-grid').style.display = 'none';
+  document.getElementById('swarm-toolbar').style.display = 'none';
+  document.getElementById('swarm-empty-state').style.display = 'none';
+  const detail = document.getElementById('swarm-detail');
+  detail.style.display = 'block';
+
+  const org = getOrg();
+  const swarmAgents = agents.filter(a => a.swarmId === swarmId);
+  const unassigned = agents.filter(a => !a.swarmId && a.id);
+
+  // Header
+  document.getElementById('swarm-detail-header').innerHTML = `
+    <div class="swarm-detail-hero">
+      <div class="swarm-icon">&#x2B21;</div>
+      <div>
+        <div class="swarm-name" style="font-size:20px;">${esc(swarm.name)}</div>
+        <div class="swarm-ens" style="font-size:12px;">${esc(swarm.ens || '')}</div>
+        <div style="color:var(--text-dim);font-size:12px;margin-top:4px;">${esc(swarm.description || '')}</div>
+        ${swarm.walletAddress ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:6px;">Wallet: ${esc(swarm.walletAddress)}</div>` : ''}
+      </div>
+      <div class="swarm-detail-actions">
+        <button class="btn-swarm-chat" onclick="openSwarmChat('${esc(swarmId)}')">&#x1F4AC; Group Chat</button>
+      </div>
+    </div>
+  `;
+
+  // Agent lists
+  let html = '';
+
+  // Members
+  html += `<div class="swarm-section-title">Swarm Members (${swarmAgents.length})</div>`;
+  if (swarmAgents.length === 0) {
+    html += '<div style="color:var(--text-dim);font-size:12px;padding:16px;text-align:center;margin-bottom:24px;">No agents assigned to this swarm yet.</div>';
+  } else {
+    html += swarmAgents.map(a => `
+      <div class="swarm-agent-item">
+        <div class="agent-avatar" style="width:36px;height:36px;border-radius:8px;">
+          <img src="${a.typeIcon || agentSvg(a.type)}" alt="" style="width:100%;height:100%;object-fit:contain;">
+        </div>
+        <div class="agent-info">
+          <div class="agent-name" style="font-size:13px;">${esc(a.name)}</div>
+          <div class="agent-ens" style="font-size:10px;">${esc(a.ens || '')}</div>
+        </div>
+        <span class="status-dot ${esc(a.status || 'offline')}"></span>
+        <button class="btn-remove" onclick="event.stopPropagation();removeAgentFromSwarm('${esc(a.id)}','${esc(swarmId)}')">Remove</button>
+      </div>
+    `).join('');
+  }
+
+  // Available agents to assign
+  if (unassigned.length > 0) {
+    html += `<div class="swarm-section-title" style="margin-top:24px;">Available Agents (${unassigned.length})</div>`;
+    html += unassigned.map(a => `
+      <div class="swarm-agent-item">
+        <div class="agent-avatar" style="width:36px;height:36px;border-radius:8px;">
+          <img src="${a.typeIcon || agentSvg(a.type)}" alt="" style="width:100%;height:100%;object-fit:contain;">
+        </div>
+        <div class="agent-info">
+          <div class="agent-name" style="font-size:13px;">${esc(a.name)}</div>
+          <div class="agent-ens" style="font-size:10px;">${esc(a.ens || '')}</div>
+        </div>
+        <span class="status-dot ${esc(a.status || 'offline')}"></span>
+        <button class="btn-assign" onclick="event.stopPropagation();assignAgentToSwarm('${esc(a.id)}','${esc(swarmId)}')">+ Assign</button>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('swarm-detail-agents').innerHTML = html;
+  document.getElementById('swarm-detail-chat').innerHTML = '';
+}
+
+function closeSwarmDetail() {
+  activeSwarmId = null;
+  document.getElementById('swarm-detail').style.display = 'none';
+  if (swarmChatWs) { swarmChatWs.close(); swarmChatWs = null; }
+  renderSwarmGrid();
+}
+
+function assignAgentToSwarm(agentId, swarmId) {
+  const agent = agents.find(a => a.id === agentId);
+  if (!agent) return;
+  const swarm = getSwarmById(swarmId);
+
+  // Update agent
+  agent.swarmId = swarmId;
+  // Rebuild ENS to reflect swarm hierarchy
+  if (swarm) {
+    agent.ens = buildAgentENS(agent.name.toLowerCase().replace(/[^a-z0-9-]/g, ''), swarmId);
+  }
+  saveAgents();
+
+  // Update swarm agent count
+  const swarms = getSwarms();
+  const sw = swarms.find(s => s.id === swarmId);
+  if (sw) {
+    sw.agentCount = agents.filter(a => a.swarmId === swarmId).length;
+    saveSwarms(swarms);
+  }
+
+  openSwarmDetail(swarmId);
+}
+
+function removeAgentFromSwarm(agentId, swarmId) {
+  const agent = agents.find(a => a.id === agentId);
+  if (!agent) return;
+
+  agent.swarmId = null;
+  saveAgents();
+
+  // Update swarm agent count
+  const swarms = getSwarms();
+  const sw = swarms.find(s => s.id === swarmId);
+  if (sw) {
+    sw.agentCount = agents.filter(a => a.swarmId === swarmId).length;
+    saveSwarms(swarms);
+  }
+
+  openSwarmDetail(swarmId);
+}
+
+// ═══════════════════════════════════════
+// SWARM GROUP CHAT
+// ═══════════════════════════════════════
+
+let swarmChatWs = null;
+const BRIDGE_URL = window.POC_BRIDGE_URL || 'http://localhost:3002';
+
+function openSwarmChat(swarmId) {
+  const swarm = getSwarmById(swarmId);
+  if (!swarm) return;
+
+  const org = getOrg();
+  const myEns = org ? (org.ens || org.slug + '.proofofclaw.eth') : 'anonymous.proofofclaw.eth';
+  const channelId = swarm.channelId;
+
+  const chatEl = document.getElementById('swarm-detail-chat');
+
+  // Render chat container
+  chatEl.innerHTML = `
+    <div class="swarm-chat-container">
+      <div class="swarm-chat-header">
+        <div>
+          <h3>${esc(swarm.name)} Group Chat</h3>
+          <div class="swarm-chat-members">Messaging as <span style="color:var(--cyan);">${esc(myEns)}</span> ${channelId ? '&mdash; ENS-authenticated channel' : ''}</div>
+        </div>
+        <button style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);padding:6px 12px;cursor:pointer;font-size:11px;" onclick="closeSwarmChat()">Close Chat</button>
+      </div>
+      <div class="swarm-chat-messages" id="swarm-chat-messages"></div>
+      <div class="swarm-chat-compose">
+        <textarea id="swarm-chat-input" placeholder="Message as ${esc(myEns)}..." rows="1"></textarea>
+        <button class="swarm-chat-send" onclick="sendSwarmChatMessage()">&#x27A4;</button>
+      </div>
+    </div>
+  `;
+
+  const msgContainer = document.getElementById('swarm-chat-messages');
+
+  // If no channelId, try connecting anyway — bridge may still work for local messaging
+  if (!channelId) {
+    msgContainer.innerHTML = `
+      <div class="swarm-chat-system">No bridge channel configured for this swarm. Messages are local only.</div>
+    `;
+  }
+
+  // Load history from bridge
+  if (channelId) {
+    fetch(`${BRIDGE_URL}/channels/${encodeURIComponent(channelId)}/messages`)
+      .then(r => r.ok ? r.json() : { messages: [] })
+      .then(data => {
+        (data.messages || []).forEach(msg => appendSwarmChatMsg(msg, myEns));
+      })
+      .catch(() => {
+        // Bridge might not have history endpoint yet
+      });
+  }
+
+  // Connect WebSocket for live messages
+  try {
+    const wsUrl = BRIDGE_URL.replace(/^http/, 'ws');
+    const params = new URLSearchParams({ ensName: myEns });
+    if (channelId) params.set('channelId', channelId);
+    swarmChatWs = new WebSocket(`${wsUrl}/ws/chat?${params}`);
+
+    swarmChatWs.onopen = () => {
+      appendSwarmChatSystem('Connected to swarm channel.');
+    };
+
+    swarmChatWs.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        appendSwarmChatMsg(msg, myEns);
+      } catch (_) {}
+    };
+
+    swarmChatWs.onerror = () => {
+      appendSwarmChatSystem('Bridge connection error. Ensure swarm-bridge is running (make run-swarm-bridge).');
+    };
+
+    swarmChatWs.onclose = () => {
+      appendSwarmChatSystem('Disconnected from swarm channel.');
+    };
+  } catch (e) {
+    appendSwarmChatSystem('Could not connect to bridge: ' + e.message);
+  }
+
+  // Enter to send
+  const input = document.getElementById('swarm-chat-input');
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendSwarmChatMessage();
+      }
+    });
+    input.focus();
+  }
+}
+
+function closeSwarmChat() {
+  if (swarmChatWs) { swarmChatWs.close(); swarmChatWs = null; }
+  document.getElementById('swarm-detail-chat').innerHTML = '';
+}
+
+function sendSwarmChatMessage() {
+  const input = document.getElementById('swarm-chat-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const org = getOrg();
+  const myEns = org ? (org.ens || org.slug + '.proofofclaw.eth') : 'anonymous.proofofclaw.eth';
+  const swarm = activeSwarmId ? getSwarmById(activeSwarmId) : null;
+  const channelId = swarm?.channelId;
+
+  // Show optimistic message
+  appendSwarmChatMsg({ from: myEns, text, ts: Date.now() }, myEns);
+
+  // Send via WS if connected
+  if (swarmChatWs && swarmChatWs.readyState === WebSocket.OPEN) {
+    swarmChatWs.send(JSON.stringify({ type: 'message', text, channelId }));
+  } else if (channelId) {
+    // Fallback: HTTP POST to bridge
+    fetch(`${BRIDGE_URL}/send-channel-message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelId, text, ensName: myEns })
+    }).catch(() => {});
+  }
+}
+
+function appendSwarmChatMsg(msg, myEns) {
+  const container = document.getElementById('swarm-chat-messages');
+  if (!container) return;
+  const isSelf = msg.from === myEns;
+
+  const div = document.createElement('div');
+  div.className = 'swarm-chat-msg ' + (isSelf ? 'self' : 'other');
+  div.innerHTML = `
+    ${!isSelf ? `<div class="swarm-chat-sender">${esc(msg.from || 'unknown')}</div>` : ''}
+    <div class="chat-msg-bubble" style="padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.55;word-break:break-word;">${esc(msg.text || '')}</div>
+    <div class="chat-msg-time" style="font-size:10px;color:var(--text-dim);margin-top:4px;padding:0 4px;${isSelf ? 'text-align:right;' : ''}">${new Date(msg.ts || Date.now()).toLocaleTimeString()}</div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendSwarmChatSystem(text) {
+  const container = document.getElementById('swarm-chat-messages');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'swarm-chat-system';
+  div.textContent = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
 }
 
 // ═══════════════════════════════════════
@@ -4261,6 +5093,29 @@ function updateStepStatus(steps, idx, status) {
     if (steps[idx]) steps[idx].querySelector('.step-icon').innerHTML = '\u2713';
   }
 }
+
+// ═══════════════════════════════════════
+// GLOBAL EXPORTS (module → window for onclick handlers)
+// ═══════════════════════════════════════
+
+Object.assign(window, {
+  // Swarm tab functions
+  switchMainTab, renderSwarmGrid, openSwarmDetail, closeSwarmDetail,
+  assignAgentToSwarm, removeAgentFromSwarm,
+  openSwarmChat, closeSwarmChat, sendSwarmChatMessage,
+  // Existing module functions need global exposure for inline onclick handlers
+  openWizard, closeWizard, openProfile, openChat, closeChat,
+  openConnectModal, closeConnectModal,
+  setFilter, showRegisterMenu, hideRegisterMenu,
+  copyAgentUrl, copyProfileUrl,
+  generateAgentWalletNow, wizardNext, wizardBack,
+  selectType, refreshSwarmSelector, deleteAgent,
+  toggleProfileEdit, saveProfileEdit, closeProfile,
+  openUpdateConfig, saveUpdatedConfig, lookupENS,
+  chatSend, chatInsert, chatTriggerAttach, chatHandleFiles,
+  chatRemoveAttach, chatCancelVoice, chatOpenProfile, chatPlayVoice,
+  renderAgents, esc,
+});
 
 // ═══════════════════════════════════════
 // BOOT

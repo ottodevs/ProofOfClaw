@@ -39,6 +39,9 @@ contract ProofOfClawINFT {
     /// @notice Agent ID (bytes32) → Token ID
     mapping(bytes32 => uint256) public agentToToken;
 
+    /// @notice ENS name hash → Token ID (prevents duplicate ENS claims)
+    mapping(bytes32 => uint256) public ensNameToToken;
+
     /// @notice Token ID → Approved address
     mapping(uint256 => address) private _tokenApprovals;
 
@@ -86,6 +89,8 @@ contract ProofOfClawINFT {
     error OnlyAdmin();
     error TransferToNonReceiver();
     error SoulBackupRequired();
+    error ENSNameAlreadyClaimed();
+    error ENSNameEmpty();
 
     // ─── Constructor ────────────────────────────────────────────────────
 
@@ -152,6 +157,10 @@ contract ProofOfClawINFT {
     ) internal returns (uint256 tokenId) {
         if (agentToToken[agentId] != 0) revert AgentAlreadyMinted();
         if (soulBackupHash == bytes32(0)) revert SoulBackupRequired();
+        if (bytes(ensName).length == 0) revert ENSNameEmpty();
+
+        bytes32 ensHash = keccak256(bytes(ensName));
+        if (ensNameToToken[ensHash] != 0) revert ENSNameAlreadyClaimed();
 
         tokenId = _nextTokenId++;
 
@@ -172,6 +181,7 @@ contract ProofOfClawINFT {
         });
 
         agentToToken[agentId] = tokenId;
+        ensNameToToken[ensHash] = tokenId;
         _balances[to]++;
 
         emit Transfer(address(0), to, tokenId);
@@ -299,6 +309,11 @@ contract ProofOfClawINFT {
     /// @notice Get token ID for a Proof of Claw agent
     function getTokenByAgent(bytes32 agentId) external view returns (uint256) {
         return agentToToken[agentId];
+    }
+
+    /// @notice Get token ID for an ENS name
+    function getTokenByENS(string calldata ensName) external view returns (uint256) {
+        return ensNameToToken[keccak256(bytes(ensName))];
     }
 
     /// @notice Get full agent data

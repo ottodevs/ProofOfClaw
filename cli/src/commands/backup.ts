@@ -156,21 +156,34 @@ export function registerBackupCommands(program: Command): void {
             process.exit(1);
           }
 
+          let cid = "(dry-run)";
+
           if (!opts.dryRun) {
-            // Upload to 0G Storage
+            // Upload encrypted payload + decryption envelope to 0G Storage
             console.log(chalk.dim("  Uploading to 0G storage..."));
             const { Indexer: ZgIndexer } = await import("@0glabs/0g-ts-sdk");
             const { ogSigner: uploadSigner } = getSigners(config);
             const zgIndexer = new ZgIndexer(config.zeroGIndexerRpc || "https://indexer-storage-testnet-turbo.0g.ai");
-            const uploadBlob = new Blob([encrypted.ciphertext], { type: "application/octet-stream" });
-            const uploadFile = new File([uploadBlob], "backup.enc", { type: "application/octet-stream" });
+
+            // Pack decryption metadata (nonce, authTag, aad) alongside ciphertext
+            // so the backup can be decrypted on restore
+            const envelope = JSON.stringify({
+              version: 1,
+              nonce: encrypted.nonce.toString("hex"),
+              authTag: encrypted.authTag.toString("hex"),
+              aad: encrypted.aad ? encrypted.aad.toString("hex") : "",
+              ciphertextBase64: Buffer.from(encrypted.ciphertext).toString("base64"),
+            });
+
+            const uploadBlob = new Blob([envelope], { type: "application/json" });
+            const uploadFile = new File([uploadBlob], "backup.enc.json", { type: "application/json" });
             const evmRpc = config.zeroGEvmRpc || "https://evmrpc-testnet.0g.ai";
             const [uploadResult, uploadErr] = await zgIndexer.upload(uploadFile, evmRpc, uploadSigner);
             if (uploadErr) {
               console.error(chalk.red(`  0G upload failed: ${uploadErr.message || uploadErr}`));
               process.exit(1);
             }
-            const cid = uploadResult.rootHash || uploadResult.txHash;
+            cid = uploadResult.rootHash || uploadResult.txHash;
             console.log(chalk.green(`  Uploaded to 0G. Root hash: ${cid}`));
 
             // Record on-chain

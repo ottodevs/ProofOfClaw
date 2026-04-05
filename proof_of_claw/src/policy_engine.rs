@@ -40,9 +40,9 @@ impl PolicyEngine {
                 if value_u64 > self.config.max_value_autonomous_wei {
                     return PolicyResult {
                         rule_id: "value_threshold".to_string(),
-                        severity: PolicySeverity::Warn,
+                        severity: PolicySeverity::Block,
                         details: format!(
-                            "Action value {} wei exceeds autonomous threshold {} wei",
+                            "Action value {} wei exceeds autonomous threshold {} wei — requires Ledger approval",
                             value_u64, self.config.max_value_autonomous_wei
                         ),
                     };

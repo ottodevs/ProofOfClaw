@@ -55,6 +55,15 @@ const ENSResolver = (() => {
   let _rpcUrl = RPC_ENDPOINTS.sepolia;
   let _network = 'sepolia';
 
+  // ── ENS Name Normalization (ENSIP-15 / UTS-46 basic) ──
+  // Full UTS-46 requires @adraffy/ens-normalize, but we apply basic
+  // lowercase + dot-normalization to catch the most common issues.
+  function normalizeEnsName(name) {
+    if (!name) return name;
+    // Lowercase, trim whitespace, strip trailing dots, collapse consecutive dots
+    return name.trim().toLowerCase().replace(/\.+$/, '').replace(/\.{2,}/g, '.');
+  }
+
   // ── Public API ──
 
   function setNetwork(network) {
@@ -71,6 +80,7 @@ const ENSResolver = (() => {
    * Returns an agent profile object or null if not found.
    */
   async function resolveAgent(ensName) {
+    ensName = normalizeEnsName(ensName);
     try {
       const address = await resolveAddress(ensName);
       if (!address) return null;
@@ -105,6 +115,7 @@ const ENSResolver = (() => {
    * Resolve ENS name to Ethereum address.
    */
   async function resolveAddress(ensName) {
+    ensName = normalizeEnsName(ensName);
     const node = namehash(ensName);
 
     // Try universal resolver first (supports subnames + wildcards)
@@ -156,6 +167,7 @@ const ENSResolver = (() => {
    * Fetch all Proof of Claw text records for an ENS name.
    */
   async function fetchTextRecords(ensName) {
+    ensName = normalizeEnsName(ensName);
     const node = namehash(ensName);
     const records = {};
 
@@ -177,12 +189,12 @@ const ENSResolver = (() => {
         // ABI encode: text(bytes32 node, string key)
         const nodeParam = node.slice(2).padStart(64, '0');
         const offsetParam = '0000000000000000000000000000000000000000000000000000000000000040';
-        const lengthParam = keyHex.length.toString(16).padStart(64, '0');
-        // Right-pad key to 32 bytes
-        const keyPadded = keyHex + '0'.repeat(64 - (keyHex.length % 64 || 64));
+        const keyByteLen = keyHex.length / 2;
+        // Right-pad key to next 32-byte boundary
+        const keyPadded = keyHex + '0'.repeat((64 - (keyHex.length % 64)) % 64);
 
         const calldata = '0x59d1d43c' + nodeParam + offsetParam +
-          (keyHex.length / 2).toString(16).padStart(64, '0') + keyPadded;
+          keyByteLen.toString(16).padStart(64, '0') + keyPadded;
 
         const result = await ethCall(resolverAddr, calldata);
         if (result && result.length > 130) {
@@ -431,6 +443,23 @@ const ENSResolver = (() => {
     return head + tail;
   }
 
+  // ── Runtime keccak256/namehash verification ──
+  // Verify against known test vectors (EIP-137) at load time to catch
+  // any regression in the hand-rolled keccak256 implementation.
+  (() => {
+    const vectors = [
+      ['', '0x' + '00'.repeat(32)],
+      ['eth', '0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae'],
+      ['vitalik.eth', '0xee6c4522aab0003e8d14cd40a6af439055fd2577951148c14b6cea9a53475835'],
+    ];
+    for (const [name, expected] of vectors) {
+      const got = namehash(name);
+      if (got !== expected) {
+        console.error(`[ENS] CRITICAL: namehash("${name}") = ${got}, expected ${expected}. Keccak256 implementation is broken.`);
+      }
+    }
+  })();
+
   // ── Public exports ──
   return {
     setNetwork,
@@ -440,6 +469,7 @@ const ENSResolver = (() => {
     fetchTextRecords,
     discoverAgents,
     namehash,
+    normalizeEnsName,
     RECORD_KEYS,
     RPC_ENDPOINTS,
   };

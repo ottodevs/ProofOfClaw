@@ -21,6 +21,8 @@ const CONTRACT_ABIS = {
     'function agentToToken(bytes32 agentId) external view returns (uint256)',
     'function agents(uint256 tokenId) external view returns (address owner, bytes32 agentId, bytes32 policyHash, bytes32 riscZeroImageId, string memory encryptedURI, bytes32 metadataHash, string memory ensName, uint256 reputationScore, uint256 totalProofs, uint256 mintedAt, bool active)',
     'function ownerOf(uint256 tokenId) external view returns (address)',
+    'function balanceOf(address owner) external view returns (uint256)',
+    'function totalSupply() external view returns (uint256)',
     'function transferFrom(address from, address to, uint256 tokenId) external',
     'event AgentMinted(uint256 indexed tokenId, bytes32 indexed agentId, address indexed owner, string ensName)',
   ]),
@@ -198,8 +200,11 @@ export async function registerAgentOnchain(agentConfig) {
   const encryptedURI = storageURI;
   const metadataHash = storageRootHash;
 
-  // Get contract addresses for network
+  // Get contract addresses for network — reject mainnet until contracts are deployed
   const addresses = CONTRACT_ADDRESSES[network] || CONTRACT_ADDRESSES.sepolia;
+  if (!addresses || !addresses.inft || addresses.inft === '0x0000000000000000000000000000000000000000') {
+    throw new Error(`Contracts not yet deployed on ${network}. Use sepolia or og_testnet.`);
+  }
 
   try {
     // iNFT mints to the user's wallet (msg.sender) — user protects the valuable asset.
@@ -316,6 +321,86 @@ export async function getAgentDetails(tokenId, network = 'sepolia') {
 }
 
 // ═══════════════════════════════════════
+// WALLET iNFT ENUMERATION
+// ═══════════════════════════════════════
+
+/**
+ * Get all iNFTs owned by a wallet address.
+ * Uses AgentMinted event logs filtered by owner, then verifies current ownership
+ * and fetches full agent details for each token.
+ * @param {string} ownerAddress - Wallet address to query
+ * @param {string} network - Network key ('sepolia' | 'og_testnet')
+ * @returns {Promise<Array<{tokenId: string, owner: string, agentId: string, ensName: string, mintedAt: string, reputationScore: string, totalProofs: string, active: boolean, policyHash: string, encryptedURI: string, metadataHash: string, riscZeroImageId: string}>>}
+ */
+export async function getWalletINFTs(ownerAddress, network = 'sepolia') {
+  if (!publicClient) initViem(network);
+
+  const addresses = CONTRACT_ADDRESSES[network] || CONTRACT_ADDRESSES.sepolia;
+
+  // Fetch AgentMinted events where owner matches
+  const logs = await publicClient.getLogs({
+    address: addresses.inft,
+    event: {
+      type: 'event',
+      name: 'AgentMinted',
+      inputs: [
+        { type: 'uint256', name: 'tokenId', indexed: true },
+        { type: 'bytes32', name: 'agentId', indexed: true },
+        { type: 'address', name: 'owner', indexed: true },
+        { type: 'string', name: 'ensName', indexed: false },
+      ],
+    },
+    args: { owner: ownerAddress },
+    fromBlock: 0n,
+    toBlock: 'latest',
+  });
+
+  // For each minted token, verify current ownership (may have been transferred)
+  // and fetch full agent details
+  const results = [];
+  for (const log of logs) {
+    const tokenId = log.args.tokenId;
+    try {
+      const currentOwner = await publicClient.readContract({
+        address: addresses.inft,
+        abi: CONTRACT_ABIS.inft,
+        functionName: 'ownerOf',
+        args: [tokenId],
+      });
+
+      // Skip if no longer owned by this address
+      if (currentOwner.toLowerCase() !== ownerAddress.toLowerCase()) continue;
+
+      const agent = await publicClient.readContract({
+        address: addresses.inft,
+        abi: CONTRACT_ABIS.inft,
+        functionName: 'agents',
+        args: [tokenId],
+      });
+
+      results.push({
+        tokenId: tokenId.toString(),
+        owner: agent[0],
+        agentId: agent[1],
+        policyHash: agent[2],
+        riscZeroImageId: agent[3],
+        encryptedURI: agent[4],
+        metadataHash: agent[5],
+        ensName: agent[6],
+        reputationScore: agent[7].toString(),
+        totalProofs: agent[8].toString(),
+        mintedAt: new Date(Number(agent[9]) * 1000).toISOString(),
+        active: agent[10],
+      });
+    } catch (e) {
+      console.warn(`Failed to fetch details for token ${tokenId}:`, e.message);
+    }
+  }
+
+  return results;
+}
+
+// ═══════════════════════════════════════
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════
 
@@ -415,6 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
     registerAgentOnchain,
     checkAgentRegistration,
     getAgentDetails,
+    getWalletINFTs,
     switchNetwork,
     formatAddress,
     getExplorerUrl,

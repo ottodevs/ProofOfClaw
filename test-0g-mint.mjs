@@ -15,7 +15,11 @@ config(); // Load .env
 
 // ── Config ──────────────────────────────────────────────────────────
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const SEPOLIA_RPC = process.env.RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/scR1Fc9-4XIVgYevigWXy';
+const SEPOLIA_RPC = process.env.RPC_URL;
+if (!SEPOLIA_RPC) {
+  console.error('ERROR: RPC_URL not set in .env (e.g. https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY)');
+  process.exit(1);
+}
 const ZG_INDEXER = 'https://indexer-storage-testnet-turbo.0g.ai';
 const ZG_EVM_RPC = process.env.ZERO_G_CHAIN_RPC || 'https://evmrpc-testnet.0g.ai';
 const AGENT_NAME = process.env.AGENT_ID || 'openclaw';

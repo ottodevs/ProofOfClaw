@@ -45,7 +45,16 @@ body {
   line-height: 1.6;
   font-size: 14px;
   overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
+
+/* Word-break for hashes and long strings on mobile */
+code, .hash, .address, [class*="hash"], [class*="address"] {
+  word-break: break-all;
+}
+
+/* Prevent images from overflowing */
+img { max-width: 100%; height: auto; }
 
 /* ── Scanline Overlay (GPU-promoted) ── */
 body::after {
@@ -849,7 +858,16 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
 }
 
 /* ================================================================
-   RESPONSIVE - MOBILE SIDEBAR
+   RESPONSIVE — TABLET (1024px)
+   ================================================================ */
+@media (max-width: 1024px) {
+  .main-content {
+    padding: 1.25rem;
+  }
+}
+
+/* ================================================================
+   RESPONSIVE — MOBILE SIDEBAR (768px)
    ================================================================ */
 @media (max-width: 768px) {
   .mobile-menu-btn {
@@ -865,9 +883,17 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   .main-content {
     margin-left: 0 !important;
   }
+  .main-area {
+    margin-left: 0 !important;
+  }
   .topbar {
     left: 0 !important;
     padding: 0 1rem;
+  }
+  .top-bar {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
   .sidebar-toggle {
     display: none;
@@ -890,8 +916,25 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   .modal-body {
     padding: 18px;
   }
+  /* Tables — horizontal scroll */
+  .table-wrap, table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Generic form rows */
+  .form-row {
+    grid-template-columns: 1fr !important;
+  }
+  /* Touch-friendly tap targets */
+  button, .btn, a.btn, select, input[type="submit"] {
+    min-height: 44px;
+  }
 }
 
+/* ================================================================
+   RESPONSIVE — SMALL MOBILE (480px)
+   ================================================================ */
 @media (max-width: 480px) {
   .topbar {
     padding: 0 0.75rem;
@@ -899,6 +942,9 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   }
   .topbar-title {
     font-size: 0.95rem;
+  }
+  .top-bar-title {
+    font-size: 1rem;
   }
   .btn {
     padding: 0.5rem 1rem;
@@ -910,5 +956,13 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   }
   .modal-header h2 {
     font-size: 16px;
+  }
+  .card {
+    padding: 0.75rem;
+    border-radius: 8px;
+  }
+  /* Stack flex containers */
+  .topbar-right {
+    gap: 0.5rem;
   }
 }

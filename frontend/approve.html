@@ -708,15 +708,19 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
 /* ======================================== */
 @media (max-width: 768px) {
   :root { --sidebar-w: 0px; }
+  .sidebar { transform: translateX(-100%); z-index: 300; }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .mobile-menu-btn { display: flex; }
   .topbar { left: 0 !important; padding: 0 1rem; }
   .main-content { margin-left: 0 !important; padding: 1.25rem 1rem; }
   .ledger-card { flex-direction: column; align-items: flex-start; }
   .action-card-top { flex-direction: column; }
-  .action-buttons { justify-content: stretch; }
-  .action-buttons button { flex: 1; }
+  .action-buttons { justify-content: stretch; flex-wrap: wrap; }
+  .action-buttons button { flex: 1; min-width: 120px; }
   .history-table { font-size: 0.75rem; }
   .history-table th, .history-table td { padding: 0.5rem 0.6rem; }
   .action-details { grid-template-columns: 1fr 1fr; }
+  .topbar-right { flex-wrap: wrap; gap: 0.5rem; }
 }
 
 @media (max-width: 480px) {
@@ -1073,18 +1077,21 @@ let _ledgerAddress = null; // full checksummed address from device
 let _openTransport = null; // keep transport alive across retries
 const DERIVE_PATH = "44'/60'/0'/0/0";
 
-// EIP-712 domain — must mirror backend ApprovalAction exactly
+// EIP-712 domain — must mirror on-chain ProofOfClawVerifier DOMAIN_TYPEHASH exactly.
+// verifyingContract is populated at runtime from the connected contract address.
 const EIP712_DOMAIN = {
   name: 'ProofOfClaw',
   version: '1',
-  chainId: 11155111, // Sepolia
+  chainId: Number(localStorage.getItem('poc_chain_id') || 11155111),
+  verifyingContract: localStorage.getItem('poc_verifier_address') || '0x0000000000000000000000000000000000000000',
 };
+// Matches on-chain APPROVAL_TYPEHASH:
+// keccak256("ActionApproval(bytes32 agentId,bytes32 outputCommitment,uint256 actionValue)")
 const EIP712_TYPES = {
-  ApprovalAction: [
-    { name: 'description', type: 'string' },
-    { name: 'value_wei',   type: 'uint64' },
-    { name: 'nonce',       type: 'uint64' },
-    { name: 'timestamp',   type: 'uint64' },
+  ActionApproval: [
+    { name: 'agentId',          type: 'bytes32' },
+    { name: 'outputCommitment', type: 'bytes32' },
+    { name: 'actionValue',      type: 'uint256' },
   ],
 };
 
@@ -1230,19 +1237,23 @@ function disconnectLedger() {
 // =====================================================
 async function loadPendingActions() {
   try {
-    // Try live API first
-    const resp = await fetch('/api/pending-actions');
+    const conn = (typeof PocAPI !== 'undefined' && PocAPI.isConnected()) ? PocAPI.getConnection() : null;
+    const base = conn ? conn.url : '';
+    const resp = await fetch(base + '/api/pending-actions', {
+      headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('poc_gateway_token') || '') },
+    });
     if (resp.ok) {
       pendingActions = await resp.json();
       renderPendingActions();
       return;
     }
   } catch (e) {
-    // API not available, use mock data
+    // API not available
   }
 
-  // Fallback to mock data
-  pendingActions = [...MOCK_PENDING];
+  // Fallback to mock data — clearly labeled so users don't sign real txs for fake actions
+  pendingActions = MOCK_PENDING.map(a => ({ ...a, _isMock: true }));
+  showToast('&#x26A0;&#xFE0F; API unavailable \u2014 showing demo data (signatures are no-ops)', 'warn', 6000);
   renderPendingActions();
 }
 
@@ -1355,20 +1366,20 @@ async function confirmSign() {
 
   const action = currentSigningAction;
 
-  // Build EIP-712 message matching backend ApprovalAction struct
-  const nonce = Math.floor(Math.random() * 2 ** 32);
-  const timestamp = Math.floor(Date.now() / 1000);
-  const valueWei = Math.round(parseFloat(action.valueEth || '0') * 1e18);
+  // Build EIP-712 message matching on-chain ActionApproval struct.
+  // Use ethers.parseEther for lossless wei conversion (avoids JS float precision loss).
+  const valueWei = ethers.parseEther(action.valueEth || '0');
+  const agentIdHash = ethers.keccak256(ethers.toUtf8Bytes(action.agentId));
+  const outputCommitment = action.outputCommitment || ethers.ZeroHash;
 
   const typedData = {
     domain: EIP712_DOMAIN,
     types: EIP712_TYPES,
-    primaryType: 'ApprovalAction',
+    primaryType: 'ActionApproval',
     message: {
-      description: action.description,
-      value_wei:   valueWei,
-      nonce:       nonce,
-      timestamp:   timestamp,
+      agentId:          agentIdHash,
+      outputCommitment: outputCommitment,
+      actionValue:      valueWei,
     },
   };
 
@@ -1512,13 +1523,20 @@ async function postApproval(actionId, signature, signer, typedData) {
   if (typeof PocAPI === 'undefined' || !PocAPI.isConnected()) return null;
   try {
     const conn = PocAPI.getConnection();
+    // Parse v/r/s from the 65-byte signature for on-chain submission
+    let v, r, s;
+    if (signature && signature.length === 132) { // 0x + 130 hex chars
+      r = '0x' + signature.slice(2, 66);
+      s = '0x' + signature.slice(66, 130);
+      v = parseInt(signature.slice(130, 132), 16);
+    }
     const resp = await fetch(conn.url + '/api/approve-action', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + (localStorage.getItem('poc_gateway_token') || ''),
       },
-      body: JSON.stringify({ action_id: actionId, signature, signer, typed_data: typedData }),
+      body: JSON.stringify({ action_id: actionId, signature, v, r, s, signer, typed_data: typedData }),
     });
     if (!resp.ok) return null;
     const data = await resp.json();

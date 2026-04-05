@@ -42,10 +42,22 @@ contract ProofOfClawVerifier {
     struct PendingAction {
         bytes32 agentId;
         bytes32 outputCommitment;
+        bytes32 actionHash;
         uint256 actionValue;
         uint256 timestamp;
         bool executed;
     }
+
+    /// @notice Maximum time (seconds) a pending action remains approvable.
+    uint256 public constant ACTION_EXPIRY = 24 hours;
+
+    /// @notice EIP-712 type hashes for on-chain signature verification.
+    bytes32 public constant DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 public constant APPROVAL_TYPEHASH =
+        keccak256("ActionApproval(bytes32 agentId,bytes32 outputCommitment,uint256 actionValue)");
+    bytes32 private constant DOMAIN_NAME_HASH = keccak256("ProofOfClaw");
+    bytes32 private constant DOMAIN_VERSION_HASH = keccak256("1");
 
     struct VerifiedOutput {
         string agentId;
@@ -71,6 +83,9 @@ contract ProofOfClawVerifier {
     error TargetNotAllowed();
     error ActionAlreadySubmitted();
     error ReentrancyGuard();
+    error ActionExpired();
+    error ActionMismatch();
+    error InvalidSignature();
 
     event VerifierUpdated(address oldVerifier, address newVerifier);
     event ImageIdUpdated(bytes32 oldImageId, bytes32 newImageId);
@@ -183,6 +198,7 @@ contract ProofOfClawVerifier {
             pendingActions[actionId] = PendingAction({
                 agentId: agentId,
                 outputCommitment: output.outputCommitment,
+                actionHash: keccak256(action),
                 actionValue: output.actionValue,
                 timestamp: block.timestamp,
                 executed: false
@@ -191,6 +207,7 @@ contract ProofOfClawVerifier {
             emit ApprovalRequired(output.agentId, output.outputCommitment, output.actionValue);
         } else {
             if (msg.sender != policy.agentWallet) revert Unauthorized();
+            if (keccak256(action) != output.outputCommitment) revert ActionMismatch();
             _executeAction(action);
             emit ActionVerified(output.agentId, output.outputCommitment, true);
         }
@@ -199,15 +216,31 @@ contract ProofOfClawVerifier {
     function approveAction(
         bytes32 agentId,
         bytes32 outputCommitment,
-        bytes calldata action
+        bytes calldata action,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
     ) external nonReentrant {
         AgentPolicy memory policy = agents[agentId];
-        if (msg.sender != policy.owner) revert Unauthorized();
 
         bytes32 actionId = keccak256(abi.encodePacked(agentId, outputCommitment));
         PendingAction storage pending = pendingActions[actionId];
 
         if (pending.executed || pending.timestamp == 0) revert ActionNotPending();
+        if (block.timestamp > pending.timestamp + ACTION_EXPIRY) revert ActionExpired();
+        if (keccak256(action) != pending.actionHash) revert ActionMismatch();
+
+        // EIP-712 signature verification — signer must be the agent owner (Ledger address)
+        bytes32 domainSeparator = keccak256(abi.encode(
+            DOMAIN_TYPEHASH, DOMAIN_NAME_HASH, DOMAIN_VERSION_HASH,
+            block.chainid, address(this)
+        ));
+        bytes32 structHash = keccak256(abi.encode(
+            APPROVAL_TYPEHASH, agentId, outputCommitment, pending.actionValue
+        ));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        address signer = ecrecover(digest, v, r, s);
+        if (signer == address(0) || signer != policy.owner) revert InvalidSignature();
 
         pending.executed = true;
         _executeAction(action);

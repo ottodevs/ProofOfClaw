@@ -276,14 +276,29 @@ body.sidebar-collapsed .main-content { margin-left: 60px; }
 
 /* ─── RESPONSIVE ─── */
 @media (max-width: 768px) {
-  .topbar { left: 0 !important; }
-  .main-content { margin-left: 0 !important; }
+  .sidebar { transform: translateX(-100%); z-index: 300; }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .mobile-menu-btn { display: flex; }
+  .topbar { left: 0 !important; padding: 0 16px; }
+  .main-content { margin-left: 0 !important; padding: 20px 16px; }
   .type-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
+  .vault-container { padding: 0; }
+  .wizard-footer { flex-wrap: wrap; gap: 8px; }
+}
+
+@media (max-width: 480px) {
+  .topbar { height: 52px; padding: 0 12px; }
+  .main-content { margin-top: 52px; padding: 16px 12px; min-height: calc(100vh - 52px); }
+  .topbar-title { font-size: 16px; }
+  .wizard-step { padding: 16px; }
+  .btn-wizard, .btn-wizard-next, .btn-wizard-back, .btn-wizard-deploy { font-size: 12px; padding: 10px 16px; }
 }
 </style>
 </head>
 <body class="has-grid">
+
+<div class="sidebar-overlay" onclick="closeMobileSidebar()"></div>
 
 <!-- ═══════ SIDEBAR ═══════ -->
 <aside class="sidebar" role="complementary" aria-label="App sidebar">
@@ -323,6 +338,7 @@ body.sidebar-collapsed .main-content { margin-left: 60px; }
 
 <!-- ═══════ TOPBAR ═══════ -->
 <header class="topbar" role="banner">
+  <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Open menu">&#9776;</button>
   <h1 class="topbar-title">Soul Vault</h1>
   <div class="topbar-right">
     <button id="wallet-connect-btn" class="btn-wizard" style="background:transparent;border:1px solid var(--border-cyan);color:var(--cyan);padding:6px 16px;font-size:12px;" onclick="connectWalletUI()">Connect Wallet</button>
