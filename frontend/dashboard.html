@@ -742,10 +742,14 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
 <main class="main-content" id="main-content" role="main">
 
   <!-- Setup Checklist (hidden once complete) -->
-  <div id="setup-checklist" class="card" style="display:none; margin-bottom:1.75rem; border:1px solid rgba(0,229,255,0.2); background:linear-gradient(135deg, rgba(0,229,255,0.04), rgba(179,136,255,0.04));">
+  <div id="setup-checklist" class="card" style="margin-bottom:1.75rem; border:1px solid rgba(0,229,255,0.2); background:linear-gradient(135deg, rgba(0,229,255,0.04), rgba(179,136,255,0.04));">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-      <div class="card-title" style="color:var(--cyan); margin-bottom:0;">Setup Checklist</div>
-      <span id="setup-progress" style="font-size:0.7rem; color:var(--text-dim);">0 / 5</span>
+      <div class="card-title" style="color:var(--cyan); margin-bottom:0;">&#9881; Setup Checklist</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="setup-progress" style="font-size:0.7rem; color:var(--text-dim);">0 / 5</span>
+        <button id="checklist-dismiss" onclick="dismissChecklist()" aria-label="Dismiss checklist"
+          style="background:transparent;border:none;color:var(--text-dim);font-size:14px;cursor:pointer;line-height:1;padding:2px 4px;" title="Dismiss">&#x2715;</button>
+      </div>
     </div>
     <div id="setup-items" style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.82rem;"></div>
   </div>
