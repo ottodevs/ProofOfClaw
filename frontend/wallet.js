@@ -98,9 +98,22 @@ async function checkWalletConnection() {
     return;
   }
 
-  const wasConnected = localStorage.getItem('poc_wallet_connected');
-  if (!wasConnected) return;
+  const walletConnected = localStorage.getItem('poc_wallet_connected');
+  const storedAddress   = localStorage.getItem('poc_wallet_address');
 
+  if (!walletConnected) return;
+
+  // ── Ledger: address already known, just restore the display ──────────────
+  // We don't re-query the device (it may not be plugged in between pages).
+  // The topbar shows the last confirmed Ledger address.
+  if (walletConnected === 'ledger') {
+    if (storedAddress) {
+      updateWalletUI(storedAddress);
+    }
+    return;
+  }
+
+  // ── Browser wallet (MetaMask / WalletConnect / etc.) ─────────────────────
   try {
     // eth_accounts does NOT pop a permission dialog — safe to call on every load
     if (window.ethereum) {

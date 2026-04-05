@@ -737,9 +737,16 @@ async function connectLedgerForOrg() {
       return;
     }
     if (msg.includes('0x5515') || msg.toLowerCase().includes('locked')) {
-      statusEl.innerHTML = '<span style="color:var(--amber);">&#x26A0;&#xFE0F; Device locked — enter PIN then click Connect Ledger again.</span>';
-    } else if (msg.includes('0x6d00') || msg.includes('0x6e00') || msg.toLowerCase().includes('ethereum')) {
-      statusEl.innerHTML = '<span style="color:var(--amber);">&#x26A0;&#xFE0F; Open the Ethereum app on your Ledger, then click Connect Ledger again.</span>';
+      statusEl.innerHTML = '<span style="color:var(--amber);">&#x26A0;&#xFE0F; <strong>Device locked</strong> — enter your PIN on the Ledger, then click Connect Ledger again.</span>';
+    } else if (
+      msg.includes('0x6511') || msg.includes('0x6d00') || msg.includes('0x6e00') ||
+      msg.includes('0x6700') || msg.toLowerCase().includes('ethereum') ||
+      msg.toLowerCase().includes('unknown_error') || msg.toLowerCase().includes('app not open')
+    ) {
+      statusEl.innerHTML =
+        '<span style="color:var(--amber);">&#x26A0;&#xFE0F; <strong>Ethereum app not open.</strong><br>' +
+        '&#x1F4F1; On your Ledger: <strong>navigate to the Ethereum app</strong> and press both buttons to open it,<br>' +
+        'then click <strong>Connect Ledger</strong> again.</span>';
     } else {
       statusEl.innerHTML = `<span style="color:var(--red);">&#x2717; ${esc(msg.slice(0, 120))}</span>`;
     }

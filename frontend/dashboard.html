@@ -1683,14 +1683,11 @@ function seedActivity() {
   // when a live agent is connected. Show the empty state placeholder instead.
   const empty = document.getElementById('activity-empty');
   if (empty) empty.style.display = '';
-<<<<<<< HEAD
 }
 
-// scheduleSimulations — Ledger card is always visible (state machine drives it)
-// No mock timers for pending approval; proof/message activity timers below remain.
+// scheduleSimulations — no mock timers; all data comes from live API
 function scheduleSimulations() {
-  // No mock timers. Ledger card is the default prompt.
-  // Pending block appears only after connect + pending action arrives.
+  // No mock timers. Connect a live agent to see real activity.
 }
 
 
@@ -1794,9 +1791,16 @@ async function dashConnectLedger() {
       return;
     }
     if (emsg.includes('0x5515') || emsg.toLowerCase().includes('locked')) {
-      if (descEl) descEl.textContent = '\u26A0\uFE0F Device locked. Unlock with PIN, then click Connect Ledger again.';
-    } else if (emsg.includes('0x6d00') || emsg.includes('0x6e00') || emsg.toLowerCase().includes('ethereum app')) {
-      if (descEl) descEl.textContent = '\u26A0\uFE0F Open the Ethereum app on your Ledger, then click Connect Ledger again.';
+      if (descEl) descEl.innerHTML = '⚠️ <strong>Device locked.</strong> Enter your PIN on the Ledger, then click Connect Ledger again.';
+    } else if (
+      emsg.includes('0x6511') || emsg.includes('0x6d00') || emsg.includes('0x6e00') ||
+      emsg.includes('0x6700') || emsg.toLowerCase().includes('ethereum') ||
+      emsg.toLowerCase().includes('unknown_error') || emsg.toLowerCase().includes('app not open')
+    ) {
+      if (descEl) descEl.innerHTML =
+        '⚠️ <strong>Ethereum app not open.</strong><br>' +
+        '📱 On your Ledger: <strong>navigate to the Ethereum app</strong> and press both buttons to open it.<br>' +
+        'Then click <strong>Connect Ledger</strong> again.';
     } else {
       if (descEl) descEl.textContent = '\u26A0\uFE0F Error: ' + emsg.slice(0, 100);
     }
@@ -1840,163 +1844,6 @@ function _dashOnLedgerConnected(deviceName, address, isSimulated) {
     (isSimulated ? 'Simulated mode' : deviceName) + ' \u2022 ' +
     address.slice(0, 8) + '\u2026' + address.slice(-4));
 }
-
-// =====================================================
-// LEDGER STATE (dashboard inline signing)
-// =====================================================
-var _dashEthApp      = null;   // hw-app-eth instance
-var _dashLedgerAddr  = null;   // checksummed address from device
-var _dashTransport   = null;   // kept alive across retries
-var _dashLedgerSim   = false;  // true when WebHID unavailable
-var _dashSignAction  = null;   // action object being signed
-
-const DASH_DERIVE_PATH = "44'/60'/0'/0/0";
-const DASH_EIP712_DOMAIN = { name: 'ProofOfClaw', version: '1', chainId: 11155111 };
-const DASH_EIP712_TYPES = {
-  ApprovalAction: [
-    { name: 'description', type: 'string' },
-    { name: 'value_wei',   type: 'uint64' },
-    { name: 'nonce',       type: 'uint64' },
-    { name: 'timestamp',   type: 'uint64' },
-  ],
-};
-
-// ─── State machine ──────────────────────────────────────────────────────────
-// 'card'    → Ledger not connected: full-width upgrade CTA (default)
-// 'idle'    → Ledger connected, no pending: compact green status bar
-// 'pending' → Ledger connected, has pending: amber approval block
-function dashLedgerSetState(state) {
-  var card    = document.getElementById('dash-ledger-card');
-  var idleBar = document.getElementById('dash-ledger-idle');
-  var pending = document.getElementById('pending-section');
-
-  // Hide all, then show the right one
-  if (card)    card.style.display    = 'none';
-  if (idleBar) idleBar.style.display = 'none';
-  if (pending) pending.style.display = 'none';
-
-  if (state === 'card') {
-    if (card) card.style.display = 'flex';
-  } else if (state === 'idle') {
-    if (idleBar) idleBar.style.display = 'flex';
-    // Populate address in idle bar
-    var addrEl = document.getElementById('dash-lmeta-idle-addr');
-    if (addrEl && _dashLedgerAddr) {
-      addrEl.textContent = _dashLedgerAddr.slice(0, 8) + '\u2026' + _dashLedgerAddr.slice(-4);
-    }
-  } else if (state === 'pending') {
-    if (pending) pending.style.display = 'block';
-  }
-}
-
-// ─── Ledger connection ───────────────────────────────────────────────────────
-async function dashConnectLedger() {
-  var btn = document.getElementById('dash-ledger-connect-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Connecting...'; }
-
-  var SDK  = window.LedgerSDK;
-  var THID = SDK && SDK.TransportWebHID;
-  var Eth  = SDK && SDK.Eth;
-
-  // Card: update icon to show connecting
-  var icon = document.getElementById('dash-ledger-icon');
-  if (icon) icon.textContent = '\u23F3';
-
-  if (!navigator.hid || !THID) {
-    // No WebHID — simulated
-    await new Promise(function(r) { setTimeout(r, 900); });
-    _dashEthApp = null;
-    _dashLedgerAddr = '0xSimulated000000000000000000000000000deadbeef';
-    _dashLedgerSim = true;
-    _dashOnLedgerConnected('Ledger (Simulated)', _dashLedgerAddr, true);
-    return;
-  }
-
-  try {
-    var transport = _dashTransport;
-    if (!transport) {
-      var permitted = await THID.list();
-      transport = permitted.length > 0
-        ? await THID.open(permitted[0])
-        : await THID.request();
-      _dashTransport = transport;
-    }
-    var eth = new Eth(transport);
-    var res = await eth.getAddress(DASH_DERIVE_PATH, false, false);
-    _dashEthApp = eth;
-    _dashLedgerAddr = res.address;
-    _dashLedgerSim = false;
-    var dev = (transport.device && transport.device.productName) || 'Ledger Device';
-    _dashOnLedgerConnected(dev, res.address, false);
-
-  } catch(err) {
-    var emsg = (err && err.message) || String(err);
-    if (btn) { btn.disabled = false; btn.textContent = '\uD83D\uDD17 Connect Ledger'; }
-    if (icon) icon.textContent = '\uD83D\uDD12';
-
-    var descEl = document.getElementById('dash-ledger-desc');
-    if (emsg.toLowerCase().includes('cancel') || emsg.toLowerCase().includes('no device')) {
-      _dashTransport = null;
-      if (descEl) descEl.textContent = 'Connection cancelled. Click Connect Ledger to try again.';
-      return;
-    }
-    if (emsg.includes('0x5515') || emsg.toLowerCase().includes('locked')) {
-      if (descEl) descEl.textContent = '\u26A0\uFE0F Device locked. Unlock with PIN, then click Connect Ledger again.';
-    } else if (emsg.includes('0x6d00') || emsg.includes('0x6e00') || emsg.toLowerCase().includes('ethereum app')) {
-      if (descEl) descEl.textContent = '\u26A0\uFE0F Open the Ethereum app on your Ledger, then click Connect Ledger again.';
-    } else {
-      if (descEl) descEl.textContent = '\u26A0\uFE0F Error: ' + emsg.slice(0, 100);
-    }
-    console.error('Dash Ledger connect:', err);
-    _dashTransport = null;
-  }
-}
-
-function _dashOnLedgerConnected(deviceName, address, isSimulated) {
-  // Update the card to connected state (briefly shown, then transitions to idle)
-  var card   = document.getElementById('dash-ledger-card');
-  var icon   = document.getElementById('dash-ledger-icon');
-  var title  = document.getElementById('dash-ledger-title');
-  var desc   = document.getElementById('dash-ledger-desc');
-  var meta   = document.getElementById('dash-ledger-meta');
-  var btn    = document.getElementById('dash-ledger-connect-btn');
-
-  if (card)  card.classList.add('connected');
-  if (icon)  icon.textContent = '\uD83D\uDD13';
-  if (title) title.textContent = 'Ledger Connected' + (isSimulated ? ' (Simulated)' : '');
-  if (desc)  desc.textContent  = 'Hardware wallet active. High-value actions will require your signature.';
-  if (meta)  meta.style.display = 'flex';
-  var devEl = document.getElementById('dash-lmeta-device');
-  var addrEl = document.getElementById('dash-lmeta-address');
-  if (devEl)  devEl.textContent  = deviceName;
-  if (addrEl) addrEl.textContent = address;
-  if (btn) {
-    btn.textContent = '\u2714 Connected';
-    btn.className   = 'btn-ledger disconnect';
-    btn.style.cursor = 'default';
-    btn.disabled = true;
-  }
-
-  // Transition to idle state after 1.5 s (card fades out, compact bar appears)
-  setTimeout(function() {
-    dashLedgerSetState('idle');
-  }, 1500);
-
-  // Log to activity feed
-  addActivity('approval', 'Ledger Connected',
-    (isSimulated ? 'Simulated mode' : deviceName) + ' \u2022 ' +
-    address.slice(0, 8) + '\u2026' + address.slice(-4));
-=======
-}
-
-// scheduleSimulations — removed fake timers, all data must come from live API
-function scheduleSimulations() {
-  // No mock simulations. Connect a live agent to see real activity.
-  // The seed script (scripts/seed_activity.py) can inject test data into the API.
->>>>>>> feat/dashboard-ux-demock
-}
-
-
 function showPendingApproval() {
   var section = document.getElementById('pending-section');
   var list    = document.getElementById('pending-list');
