@@ -23,8 +23,13 @@ contract ProofOfClawVerifier {
     /// @notice EIP-8004 integration contract for recording validation results
     IEIP8004Integration public eip8004;
 
+    /// @notice Reentrancy guard state (1 = not entered, 2 = entered)
+    uint256 private _reentrancyStatus = 1;
+
     mapping(bytes32 => AgentPolicy) public agents;
     mapping(bytes32 => PendingAction) public pendingActions;
+    mapping(address => bool) public allowedTargets;
+    mapping(bytes32 => bool) public usedActionIds;
 
     struct AgentPolicy {
         bytes32 policyHash;
@@ -63,9 +68,20 @@ contract ProofOfClawVerifier {
     error ActionNotPending();
     error AgentNotActive();
     error AgentAlreadyExists();
+    error TargetNotAllowed();
+    error ActionAlreadySubmitted();
+    error ReentrancyGuard();
 
     event VerifierUpdated(address oldVerifier, address newVerifier);
     event ImageIdUpdated(bytes32 oldImageId, bytes32 newImageId);
+    event TargetAllowlistUpdated(address target, bool allowed);
+
+    modifier nonReentrant() {
+        if (_reentrancyStatus == 2) revert ReentrancyGuard();
+        _reentrancyStatus = 2;
+        _;
+        _reentrancyStatus = 1;
+    }
 
     constructor(IRiscZeroVerifier _verifier, bytes32 _imageId) {
         verifier = _verifier;
@@ -73,8 +89,6 @@ contract ProofOfClawVerifier {
         owner = msg.sender;
     }
 
-    /// @notice Set the EIP-8004 integration contract address
-    /// @dev Called once after deployment. Only callable by owner when not yet set.
     /// @notice Update the RISC Zero verifier contract address
     /// @param newVerifier Address of the new IRiscZeroVerifier implementation
     function updateVerifier(address newVerifier) external {
@@ -94,10 +108,18 @@ contract ProofOfClawVerifier {
         emit ImageIdUpdated(oldImageId, newImageId);
     }
 
+    /// @notice Set or update the EIP-8004 integration contract address
     function setEIP8004Integration(address _eip8004) external {
         if (msg.sender != owner) revert Unauthorized();
-        require(address(eip8004) == address(0), "Already set");
+        require(_eip8004 != address(0), "Zero address");
         eip8004 = IEIP8004Integration(_eip8004);
+    }
+
+    /// @notice Add or remove an address from the allowed execution targets
+    function setAllowedTarget(address target, bool allowed) external {
+        if (msg.sender != owner) revert Unauthorized();
+        allowedTargets[target] = allowed;
+        emit TargetAllowlistUpdated(target, allowed);
     }
 
     function registerAgent(
@@ -126,7 +148,7 @@ contract ProofOfClawVerifier {
         bytes calldata seal,
         bytes calldata journalData,
         bytes calldata action
-    ) external {
+    ) external nonReentrant {
         bytes32 journalHash = sha256(journalData);
         verifier.verify(seal, imageId, journalHash);
 
@@ -155,6 +177,9 @@ contract ProofOfClawVerifier {
 
         if (output.requiresLedgerApproval) {
             bytes32 actionId = keccak256(abi.encodePacked(agentId, output.outputCommitment));
+            if (usedActionIds[actionId]) revert ActionAlreadySubmitted();
+            usedActionIds[actionId] = true;
+
             pendingActions[actionId] = PendingAction({
                 agentId: agentId,
                 outputCommitment: output.outputCommitment,
@@ -175,7 +200,7 @@ contract ProofOfClawVerifier {
         bytes32 agentId,
         bytes32 outputCommitment,
         bytes calldata action
-    ) external {
+    ) external nonReentrant {
         AgentPolicy memory policy = agents[agentId];
         if (msg.sender != policy.owner) revert Unauthorized();
 
@@ -196,6 +221,7 @@ contract ProofOfClawVerifier {
             (address, uint256, bytes)
         );
 
+        if (!allowedTargets[target]) revert TargetNotAllowed();
         (bool success, ) = target.call{value: value}(data);
         require(success, "Action execution failed");
     }
@@ -216,6 +242,14 @@ contract ProofOfClawVerifier {
 
         policy.policyHash = newPolicyHash;
         policy.maxValueAutonomous = newMaxValueAutonomous;
+    }
+
+    /// @notice Withdraw ETH held by this contract (e.g. from action execution refunds)
+    function withdraw(address payable to, uint256 amount) external {
+        if (msg.sender != owner) revert Unauthorized();
+        require(to != address(0), "Zero address");
+        (bool success, ) = to.call{value: amount}("");
+        require(success, "Transfer failed");
     }
 
     receive() external payable {}

@@ -1,5 +1,6 @@
 [workspace]
-members = ["guest", "host"]
+members = ["guest", "host", "image-id"]
+exclude = ["wasm-verifier", "boundless-prover"]
 resolver = "2"
 
 [profile.release]

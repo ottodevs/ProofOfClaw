@@ -94,7 +94,7 @@ export class AgentRegistrationManager {
   }
 
   /**
-   * Validate configuration for registration
+   * Validate configuration for registration (including soul backup)
    */
   async validateConfiguration(sessionId) {
     const session = this.registrations.get(sessionId);
@@ -103,16 +103,36 @@ export class AgentRegistrationManager {
     this.updateStatus(sessionId, 'validating', { validation: 20 });
 
     const validation = configValidator.validateAll(session.config);
-    
+
     if (!validation.valid) {
       session.errors.push(...Object.values(validation.errors).flat());
       this.updateStatus(sessionId, 'failed');
       return { valid: false, errors: validation.errors, warnings: validation.warnings };
     }
 
+    // Validate soul backup YAML (OCMB v0.1 — required for iNFT minting)
+    if (!session.config.soulBackupYaml || !session.config.soulBackupYaml.trim()) {
+      session.errors.push('Soul backup YAML is required. Agents must have a soul to mint an iNFT.');
+      this.updateStatus(sessionId, 'failed');
+      return { valid: false, errors: { soulBackup: ['Missing soul backup'] }, warnings: validation.warnings };
+    }
+
+    // Validate OCMB schema if validator available
+    if (typeof window !== 'undefined' && window.OCMBSchema) {
+      const soulValidation = window.OCMBSchema.validateOCMBYaml(session.config.soulBackupYaml);
+      if (!soulValidation.valid) {
+        session.errors.push(...soulValidation.errors.map(e => `Soul backup: ${e}`));
+        this.updateStatus(sessionId, 'failed');
+        return { valid: false, errors: { soulBackup: soulValidation.errors }, warnings: validation.warnings };
+      }
+      if (soulValidation.warnings.length > 0) {
+        session.warnings.push(...soulValidation.warnings.map(w => `Soul backup: ${w}`));
+      }
+    }
+
     session.warnings.push(...Object.values(validation.warnings).flat());
     this.updateStatus(sessionId, 'validating', { validation: 100 });
-    
+
     return { valid: true, warnings: validation.warnings };
   }
 
@@ -177,7 +197,7 @@ export class AgentRegistrationManager {
 
       this.updateStatus(sessionId, 'registering', { registration: 40 });
 
-      // Prepare registration data
+      // Prepare registration data (includes soul backup hash + URI)
       const registrationData = {
         agentId,
         ensName: config.ensName || config.ens,
@@ -185,6 +205,8 @@ export class AgentRegistrationManager {
         riscZeroImageId,
         metadataHash: results.storage?.rootHash || '0x0',
         encryptedURI: results.storage?.url || '',
+        soulBackupHash: results.soulBackup?.hash || '0x0',
+        soulBackupURI: results.soulBackup?.uri || '',
         skills: config.skills || [],
         maxTasks: config.maxTasks || 5,
         soulPersona: config.soulPersona || ''
@@ -298,28 +320,83 @@ export class AgentRegistrationManager {
   }
 
   /**
+   * Upload soul backup YAML to 0G Storage and compute hash
+   */
+  async uploadSoulBackup(sessionId) {
+    const session = this.registrations.get(sessionId);
+    if (!session) throw new Error('Session not found');
+
+    const soulYaml = session.config.soulBackupYaml;
+    if (!soulYaml) throw new Error('No soul backup YAML in session config');
+
+    this.updateStatus(sessionId, 'uploading_soul', { upload: 15 });
+
+    try {
+      const network = session.config.network.includes('mainnet') ? 'mainnet' : 'testnet';
+      const config = ZERO_G_CONFIG[network];
+
+      // Hash the soul backup (SHA-256 client-side, keccak256 on-chain)
+      const soulBackupHash = await this.hashContent(soulYaml);
+
+      this.updateStatus(sessionId, 'uploading_soul', { upload: 25 });
+
+      // Encrypt and upload to 0G Storage
+      const encryptedSoul = await this.encryptMetadata({ soulBackup: soulYaml }, session.config);
+      const uploadResult = await this.perform0GUpload(encryptedSoul, config.storage.indexer);
+
+      session.results.soulBackup = {
+        hash: soulBackupHash,
+        uri: `0g://${uploadResult.rootHash}`,
+        size: soulYaml.length,
+        timestamp: Date.now()
+      };
+
+      this.updateStatus(sessionId, 'uploading_soul', { upload: 30 });
+
+      return { success: true, soulBackup: session.results.soulBackup };
+    } catch (error) {
+      session.errors.push(`Soul backup upload failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Hash content using SHA-256 (browser SubtleCrypto)
+   */
+  async hashContent(content) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /**
    * Full registration flow
    */
   async executeFullRegistration(sessionId, walletClient, publicClient, metadata) {
     const session = this.registrations.get(sessionId);
-    
+
     try {
-      // Step 1: Validate
+      // Step 1: Validate (includes soul backup validation)
       const validation = await this.validateConfiguration(sessionId);
       if (!validation.valid) {
         return { success: false, stage: 'validation', errors: validation.errors };
       }
 
-      // Step 2: Upload to 0G Storage
+      // Step 2: Upload soul backup to 0G Storage
+      await this.uploadSoulBackup(sessionId);
+
+      // Step 3: Upload metadata to 0G Storage
       await this.uploadTo0GStorage(sessionId, metadata);
 
-      // Step 3: Register on-chain
+      // Step 4: Register on-chain (includes soul backup hash in mint calldata)
       await this.registerOnChain(sessionId, walletClient, publicClient);
 
-      // Step 4: Setup DM3
+      // Step 5: Setup DM3
       await this.setupDM3Profile(sessionId, walletClient);
 
-      // Step 5: Wait for confirmation
+      // Step 6: Wait for confirmation
       await this.waitForConfirmation(sessionId, publicClient);
 
       return {

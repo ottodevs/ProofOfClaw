@@ -467,13 +467,14 @@
     <span class="logo-text">Proof of Claw</span>
   </a>
   <nav class="sidebar-nav" aria-label="App navigation">
-    <a href="agents.html"><span class="nav-icon">&#x2B21;</span> Agents</a>
+    <a href="agents.html"><span class="nav-icon">&#x2726;</span> Agents</a>
     <a href="dashboard.html"><span class="nav-icon">&#x25A3;</span> Dashboard</a>
     <a href="auth-modules.html"><span class="nav-icon">&#x1F512;</span> Auth Modules</a>
     <a href="messages.html"><span class="nav-icon">&#x2709;</span> Messages</a>
-    <a href="proofs.html"><span class="nav-icon">&#x2713;</span> Proofs</a>
+    <a href="proofs.html"><span class="nav-icon">&#x2731;</span> Proofs</a>
     <a href="kanban.html" class="active" aria-current="page"><span class="nav-icon">&#x25A0;</span> Kanban</a>
     <a href="soul-vault.html"><span class="nav-icon">&#x2B23;</span> Soul Vault</a>
+    <a href="approve.html"><span class="nav-icon">&#x2714;</span> Approve</a>
   </nav>
   <div class="sidebar-bottom">
     <div id="poc-connection-slot"></div>
@@ -664,7 +665,10 @@ async function verifyCard(cardId) {
 
   try {
     const result = await window.zkVerify(proof.journal_b64, proof.seal_b64, proof.image_id);
-    if (result.ok) {
+    if (result.mock) {
+      // WASM not available — show info state instead of failure
+      showZkResult(cardId, result, false, 'WASM verifier not built — proof will be verified on-chain only');
+    } else if (result.ok) {
       moveCard(cardId, 'verified');
       const ms = result.verify_ms;
       showZkResult(cardId, result, true, `Verified in ${ms}ms via RISC Zero WASM`);

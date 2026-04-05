@@ -555,7 +555,7 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
   <!-- Agent Header -->
   <div class="agent-header" id="agent-header">
     <div class="agent-header-left">
-      <div class="agent-avatar" id="agent-avatar">&#x27C1;</div>
+      <div class="agent-avatar" id="agent-avatar"><img src="public/icons/coordinator.svg" alt="" style="width:100%;height:100%;object-fit:contain;"></div>
       <div class="agent-header-info">
         <h2 id="agent-name">---</h2>
         <div class="agent-header-meta">
@@ -684,7 +684,7 @@ const DEFAULT_AGENTS = [
     id: 'alpha-sentinel',
     name: 'alpha-sentinel',
     type: 'coordinator',
-    icon: '\u26A1',
+    icon: 'public/icons/coordinator.svg',
     status: 'online',
     ens: 'alpha.proofclaw.eth',
     endpoints: 'http://localhost:4443',
@@ -700,7 +700,7 @@ const DEFAULT_AGENTS = [
     id: 'defi-scout',
     name: 'defi-scout',
     type: 'defi-strategist',
-    icon: '\uD83D\uDCCA',
+    icon: 'public/icons/defi-strategist.svg',
     status: 'online',
     ens: 'defi-scout.proofclaw.eth',
     endpoints: 'http://localhost:4443',
@@ -716,7 +716,7 @@ const DEFAULT_AGENTS = [
     id: 'sec-auditor',
     name: 'sec-auditor',
     type: 'security-auditor',
-    icon: '\uD83D\uDD12',
+    icon: 'public/icons/security-auditor.svg',
     status: 'busy',
     ens: 'sec-auditor.proofclaw.eth',
     endpoints: 'http://localhost:4443',
@@ -732,7 +732,7 @@ const DEFAULT_AGENTS = [
     id: 'gov-delegate',
     name: 'gov-delegate',
     type: 'governance-agent',
-    icon: '\uD83C\uDF0F',
+    icon: 'public/icons/governance-agent.svg',
     status: 'online',
     ens: 'gov-delegate.proofclaw.eth',
     endpoints: 'http://localhost:4443',
@@ -748,7 +748,7 @@ const DEFAULT_AGENTS = [
     id: 'yield-hunter',
     name: 'yield-hunter',
     type: 'defi-strategist',
-    icon: '\uD83D\uDCB0',
+    icon: 'public/icons/defi-strategist.svg',
     status: 'offline',
     ens: 'yield-hunter.proofclaw.eth',
     endpoints: 'http://localhost:4443',
@@ -764,7 +764,7 @@ const DEFAULT_AGENTS = [
     id: 'data-oracle',
     name: 'data-oracle',
     type: 'data-analyst',
-    icon: '\uD83D\uDCC8',
+    icon: 'public/icons/data-analyst.svg',
     status: 'online',
     ens: 'data-oracle.proofclaw.eth',
     endpoints: 'http://localhost:4443',
@@ -1112,7 +1112,7 @@ function populateSelector() {
       const item = document.createElement('div');
       item.className = 'agent-search-item';
       const ens = a.ens || a.name + '.proofofclaw.eth';
-      item.innerHTML = '<span>' + (a.icon ? a.icon + ' ' : '') + a.name + '</span><span class="ens-hint">' + ens + '</span>';
+      item.innerHTML = '<span>' + (a.icon ? '<img src="' + a.icon + '" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">' : '') + a.name + '</span><span class="ens-hint">' + ens + '</span>';
       item.addEventListener('mousedown', function(e) {
         e.preventDefault();
         window.location.href = 'dashboard.html?agent=' + encodeURIComponent(a.id);
@@ -1160,7 +1160,7 @@ function renderAgent() {
   const statusLabel = a.status === 'online' ? 'Online' : a.status === 'busy' ? 'Busy' : 'Offline';
 
   // Header
-  document.getElementById('agent-avatar').textContent = a.icon || '\u27C1';
+  document.getElementById('agent-avatar').innerHTML = '<img src="' + (a.icon || 'public/icons/coordinator.svg') + '" alt="" style="width:100%;height:100%;object-fit:contain;">';
   document.getElementById('agent-name').textContent = a.name;
   document.getElementById('agent-ens').textContent = a.ens || a.name + '.proofofclaw.eth';
   document.getElementById('agent-type-badge').textContent = a.type || 'agent';

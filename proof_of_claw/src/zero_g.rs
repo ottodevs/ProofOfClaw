@@ -180,6 +180,12 @@ fn parse_attestation(body: &str) -> Option<String> {
         .find_map(|k| parsed.get(k)?.as_str().map(String::from))
 }
 
+/// Public version of attestation extraction — used by hooks to parse
+/// attestation fields from raw inference response content.
+pub fn parse_attestation_from(body: &str) -> Option<String> {
+    parse_attestation(body)
+}
+
 /// Extract a root/hash field from a JSON response body, or fall back to
 /// a plain hex string that looks like a 32-byte hash.
 fn extract_root_hash(body: &str) -> Option<String> {

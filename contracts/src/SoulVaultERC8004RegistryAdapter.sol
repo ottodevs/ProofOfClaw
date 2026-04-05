@@ -21,6 +21,9 @@ contract SoulVaultERC8004RegistryAdapter {
     /// @notice Reverse lookup: wallet address to all agent IDs it owns.
     mapping(address => bytes32[]) private _walletAgentIds;
 
+    /// @notice Per-wallet nonce to prevent same-block agent ID collisions.
+    mapping(address => uint256) private _nonces;
+
     // ----------------------------------------------------------------
     // Events
     // ----------------------------------------------------------------
@@ -36,6 +39,7 @@ contract SoulVaultERC8004RegistryAdapter {
     error OnlySelf();
     error OnlyOwner();
     error AgentNotRegistered();
+    error AgentIdCollision();
 
     // ----------------------------------------------------------------
     // Modifiers
@@ -61,7 +65,10 @@ contract SoulVaultERC8004RegistryAdapter {
     {
         if (msg.sender != agentWallet) revert OnlySelf();
 
-        agentId = keccak256(abi.encodePacked(agentWallet, block.timestamp, agentURI));
+        uint256 nonce = _nonces[agentWallet]++;
+        agentId = keccak256(abi.encodePacked(agentWallet, block.timestamp, nonce, agentURI));
+
+        if (_agentWallets[agentId] != address(0)) revert AgentIdCollision();
 
         _agentWallets[agentId] = agentWallet;
         _agentUris[agentId] = agentURI;

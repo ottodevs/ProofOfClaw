@@ -36,6 +36,16 @@ pub struct AgentConfig {
     pub inft_contract: Option<String>,
     /// RISC Zero image ID for the proof circuit.
     pub risc_zero_image_id: Option<String>,
+    /// SHA-256 hash of the OCMB v0.1 soul backup YAML (required for iNFT minting).
+    pub soul_backup_hash: Option<String>,
+    /// 0G Storage URI for the encrypted soul backup.
+    pub soul_backup_uri: Option<String>,
+    /// Path to the guest ELF binary. Set via `RISC_ZERO_GUEST_ELF_PATH` env var.
+    pub risc_zero_guest_elf_path: Option<String>,
+    /// Boundless proving marketplace API endpoint. Defaults to `https://api.boundless.xyz`.
+    pub boundless_api_url: String,
+    /// Boundless API key for authentication. Set via `BOUNDLESS_API_KEY` env var.
+    pub boundless_api_key: Option<String>,
     pub policy: PolicyConfig,
     /// True when loaded via `AgentConfig::mock()` — external services may be unavailable.
     #[serde(default)]
@@ -128,6 +138,15 @@ impl AgentConfig {
             eip8004_integration_contract: env_address("EIP8004_INTEGRATION_CONTRACT"),
             inft_contract: env_address("INFT_CONTRACT"),
             risc_zero_image_id: env_hash("RISC_ZERO_IMAGE_ID"),
+            soul_backup_hash: env_hash("SOUL_BACKUP_HASH"),
+            soul_backup_uri: env_opt("SOUL_BACKUP_URI"),
+            risc_zero_guest_elf_path: env_opt("RISC_ZERO_GUEST_ELF_PATH"),
+            boundless_api_url: env_or(
+                "BOUNDLESS_API_URL",
+                "https://api.boundless.xyz",
+                mock,
+            ),
+            boundless_api_key: env_opt("BOUNDLESS_API_KEY"),
             policy: PolicyConfig {
                 allowed_tools: env_or("ALLOWED_TOOLS", "query,read,swap_tokens,transfer", mock)
                     .split(',')

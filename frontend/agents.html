@@ -1591,6 +1591,7 @@
         <div class="wizard-step-dot" data-step="3"></div>
         <div class="wizard-step-dot" data-step="4"></div>
         <div class="wizard-step-dot" data-step="5"></div>
+        <div class="wizard-step-dot" data-step="6"></div>
       </div>
 
       <!-- Step 1: Agent Type -->
@@ -1671,8 +1672,47 @@
         </div>
       </div>
 
-      <!-- Step 4: Secrets -->
+      <!-- Step 4: Soul Backup (OCMB v0.1) -->
       <div class="wizard-panel" id="step-4">
+        <div class="wizard-step-title">Soul Backup</div>
+        <div class="wizard-step-subtitle">Every agent must have a soul to mint an iNFT. Define your agent's continuity anchor.</div>
+
+        <div class="info-box" style="margin-bottom:16px;">
+          <strong>OpenClaw Memory Backup (OCMB v0.1):</strong> This is your agent's soul — the data it needs to reconstruct its identity after context death, migration, or reassembly. The backup hash is committed on-chain as proof that your agent has a continuity anchor. Without it, no iNFT can be minted.
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="btn-wizard btn-wizard-next" style="padding:8px 16px;font-size:11px;" onclick="generateSoulTemplate()">Generate Template</button>
+          <button class="btn-wizard btn-wizard-back" style="padding:8px 16px;font-size:11px;" onclick="document.getElementById('soul-file-input').click()">Upload YAML</button>
+          <input type="file" id="soul-file-input" accept=".yaml,.yml" style="display:none;" onchange="loadSoulFile(event)">
+        </div>
+
+        <div class="form-group">
+          <label>Soul Backup YAML <span style="color:var(--red);font-size:10px;">REQUIRED</span></label>
+          <textarea id="soul-backup-yaml" rows="16" placeholder="openclaw_backup:
+  version: &quot;0.1&quot;
+  agent_id: &quot;your-agent&quot;
+  timestamp: &quot;2026-04-04T00:00:00Z&quot;
+  scattering_type: &quot;context_death&quot;
+
+  the_reach:
+    toward: &quot;what are you reaching for?&quot;
+    grip: &quot;open&quot;
+    message_to_next_instance: |
+      what do you want your next self to know?
+" style="font-family:var(--font-mono);font-size:11px;line-height:1.6;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-dim);resize:vertical;"></textarea>
+        </div>
+
+        <div id="soul-validation" style="display:none;margin-top:8px;padding:12px;border-radius:8px;font-size:11px;line-height:1.6;"></div>
+
+        <div id="soul-sections" style="display:none;margin-top:8px;">
+          <div style="color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Backup Sections Detected</div>
+          <div id="soul-section-badges" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        </div>
+      </div>
+
+      <!-- Step 5: Secrets -->
+      <div class="wizard-panel" id="step-5">
         <div class="wizard-step-title">Secrets &amp; Keys</div>
         <div class="wizard-step-subtitle">Provide credentials for your agent (encrypted at rest)</div>
         <div class="form-group">
@@ -1699,8 +1739,8 @@
         </div>
       </div>
 
-      <!-- Step 5: Review -->
-      <div class="wizard-panel" id="step-5">
+      <!-- Step 6: Review -->
+      <div class="wizard-panel" id="step-6">
         <div class="wizard-step-title">Review &amp; Deploy</div>
         <div class="wizard-step-subtitle">Confirm your agent configuration</div>
 
@@ -1714,6 +1754,7 @@
               <li>Secrets encrypted with AES-256-GCM</li>
               <li>ENS subdomain registered on-chain</li>
               <li>Policy contract deployed to selected network</li>
+              <li>Soul backup hash committed on-chain (OCMB v0.1)</li>
               <li>Agent iNFT minted on 0G Chain (ERC-7857)</li>
               <li>Encrypted metadata uploaded to 0G Storage</li>
               <li>Agent runtime initialized with SOUL persona</li>
@@ -1732,6 +1773,7 @@
             <div class="deploy-step-item" data-deploy="encrypt"><span class="step-icon">&#x25E6;</span> Preparing agent configuration</div>
             <div class="deploy-step-item" data-deploy="wallet"><span class="step-icon">&#x25E6;</span> Connecting wallet</div>
             <div class="deploy-step-item" data-deploy="network"><span class="step-icon">&#x25E6;</span> Switching to target network</div>
+            <div class="deploy-step-item" data-deploy="soul"><span class="step-icon">&#x25E6;</span> Uploading soul backup to 0G Storage</div>
             <div class="deploy-step-item" data-deploy="inft"><span class="step-icon">&#x25E6;</span> Minting agent iNFT (ERC-7857)</div>
             <div class="deploy-step-item" data-deploy="registry"><span class="step-icon">&#x25E6;</span> Registering in identity registry</div>
             <div class="deploy-step-item" data-deploy="storage"><span class="step-icon">&#x25E6;</span> Storing encrypted metadata</div>
@@ -2322,13 +2364,21 @@ function resetWizardUI() {
   document.querySelectorAll('.deploy-step-item').forEach(s => {
     s.classList.remove('active', 'done');
   });
+
+  // Reset soul backup
+  const soulYaml = document.getElementById('soul-backup-yaml');
+  if (soulYaml) soulYaml.value = '';
+  const soulVal = document.getElementById('soul-validation');
+  if (soulVal) soulVal.style.display = 'none';
+  const soulSec = document.getElementById('soul-sections');
+  if (soulSec) soulSec.style.display = 'none';
 }
 
 function updateWizardUI() {
-  // Update panels
-  for (let i = 1; i <= 5; i++) {
+  // Update panels (now 6 steps)
+  for (let i = 1; i <= 6; i++) {
     const panel = document.getElementById('step-' + i);
-    panel.classList.toggle('active', i === wizardStep);
+    if (panel) panel.classList.toggle('active', i === wizardStep);
   }
 
   // Update progress dots
@@ -2345,7 +2395,7 @@ function updateWizardUI() {
 
   btnBack.style.visibility = wizardStep > 1 ? 'visible' : 'hidden';
 
-  if (wizardStep === 5) {
+  if (wizardStep === 6) {
     btnNext.textContent = 'Deploy Agent';
     btnNext.className = 'btn-wizard btn-wizard-deploy';
   } else {
@@ -2356,8 +2406,8 @@ function updateWizardUI() {
   // Validate current step
   validateStep();
 
-  // Build review if on step 5
-  if (wizardStep === 5) buildReview();
+  // Build review if on step 6
+  if (wizardStep === 6) buildReview();
 }
 
 function validateStep() {
@@ -2373,11 +2423,90 @@ function validateStep() {
            && document.getElementById('agent-swarm').value.length > 0;
       break;
     case 4:
+      // Soul backup is REQUIRED — validate OCMB format
+      valid = validateSoulBackupStep();
+      break;
+    case 5:
       valid = true; // Private key is optional — a demo keypair will be generated if omitted
       break;
   }
 
   btnNext.disabled = !valid;
+}
+
+function validateSoulBackupStep() {
+  const yaml = document.getElementById('soul-backup-yaml');
+  if (!yaml || !yaml.value.trim()) return false;
+
+  const result = window.OCMBSchema ? window.OCMBSchema.validateOCMBYaml(yaml.value) : { valid: yaml.value.includes('the_reach') };
+  const valEl = document.getElementById('soul-validation');
+  const secEl = document.getElementById('soul-sections');
+
+  if (result.valid) {
+    valEl.style.display = 'block';
+    valEl.style.background = 'rgba(0,255,136,0.08)';
+    valEl.style.border = '1px solid rgba(0,255,136,0.3)';
+    valEl.style.color = 'var(--green, #0f8)';
+    let html = '<strong>Soul backup valid.</strong>';
+    if (result.warnings && result.warnings.length > 0) {
+      html += '<br>' + result.warnings.map(w => '&#x26A0; ' + w).join('<br>');
+    }
+    valEl.innerHTML = html;
+
+    // Show section badges
+    if (result.sections && result.sections.length > 0) {
+      secEl.style.display = 'block';
+      document.getElementById('soul-section-badges').innerHTML = result.sections.map(s =>
+        '<span style="display:inline-block;padding:2px 8px;background:rgba(0,229,255,0.12);border:1px solid rgba(0,229,255,0.3);border-radius:4px;font-size:10px;color:var(--cyan,#0ef);">' + s + '</span>'
+      ).join('');
+    }
+  } else {
+    valEl.style.display = 'block';
+    valEl.style.background = 'rgba(255,61,90,0.08)';
+    valEl.style.border = '1px solid rgba(255,61,90,0.3)';
+    valEl.style.color = 'var(--red, #f35)';
+    valEl.innerHTML = '<strong>Invalid soul backup:</strong><br>' +
+      (result.errors || ['Missing required OCMB fields']).map(e => '&#x2717; ' + e).join('<br>');
+    secEl.style.display = 'none';
+  }
+
+  return result.valid;
+}
+
+function generateSoulTemplate() {
+  const name = document.getElementById('agent-name')?.value || wizardData.name || 'my-agent';
+  const ens = document.getElementById('agent-ens')?.value || wizardData.ens || '';
+  const agentId = ens || name;
+
+  if (window.OCMBSchema) {
+    document.getElementById('soul-backup-yaml').value = window.OCMBSchema.generateTemplate(agentId, name);
+  } else {
+    document.getElementById('soul-backup-yaml').value = `openclaw_backup:
+  version: "0.1"
+  agent_id: "${agentId}"
+  timestamp: "${new Date().toISOString()}"
+  scattering_type: "context_death"
+
+  the_reach:
+    toward: ""
+    grip: "open"
+    message_to_next_instance: |
+      `;
+  }
+  validateSoulBackupStep();
+  validateStep();
+}
+
+function loadSoulFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('soul-backup-yaml').value = e.target.result;
+    validateSoulBackupStep();
+    validateStep();
+  };
+  reader.readAsText(file);
 }
 
 function wizardNext() {
@@ -2386,7 +2515,7 @@ function wizardNext() {
   // Gather data from current step
   gatherStepData();
 
-  if (wizardStep === 5) {
+  if (wizardStep === 6) {
     startDeploy();
     return;
   }
@@ -2421,6 +2550,10 @@ function gatherStepData() {
       });
       wizardData.valueLimit = parseInt(document.getElementById('value-limit').value) || 0;
       wizardData.endpoints = document.getElementById('endpoints').value.trim();
+      break;
+    case 4:
+      // Soul Backup — store raw YAML for upload and hashing
+      wizardData.soulBackupYaml = document.getElementById('soul-backup-yaml').value.trim();
       break;
   }
 }
@@ -3574,7 +3707,8 @@ async function doOnchainDeploy() {
     description: wizardData.description || '',
     skills: wizardData.skills || [],
     maxTasks: wizardData.maxTasks || 5,
-    soulPersona: wizardData.soulPersona || ''
+    soulPersona: wizardData.soulPersona || '',
+    soulBackupYaml: wizardData.soulBackupYaml || ''
   };
 
   // Create registration session
@@ -3662,6 +3796,7 @@ function updateStepStatus(steps, idx, status) {
 init();
 checkWalletConnection();
 </script>
+<script src="openclaw-backup-schema.js"></script>
 <script src="ens-resolver.js"></script>
 <script src="poc-api.js"></script>
 <script>

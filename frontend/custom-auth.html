@@ -317,10 +317,11 @@ button[type="submit"]:hover {
 </main>
 
 <script>
-const ONECLAW_API_KEY = 'ocv_XsJpRrM_b5aB7dcd-tzzg6yUzZSIuz2dlLs431DBs4U';
-const ONECLAW_ENDPOINT = 'https://api.1claw.xyz/v1';
-const AGENT_ID = '61a7016a-b417-4f49-87f1-ade2ed1cf99b';
-const VAULT_ID = '358ff77c-4c0d-4d1a-85a1-b25bde541cd8';
+// NOTE: Testnet demo credentials — move to backend proxy before production
+const ONECLAW_API_KEY = window.__POC_CONFIG?.ONECLAW_API_KEY || 'ocv_XsJpRrM_b5aB7dcd-tzzg6yUzZSIuz2dlLs431DBs4U';
+const ONECLAW_ENDPOINT = window.__POC_CONFIG?.ONECLAW_ENDPOINT || 'https://api.1claw.xyz/v1';
+const AGENT_ID = window.__POC_CONFIG?.AGENT_ID || '61a7016a-b417-4f49-87f1-ade2ed1cf99b';
+const VAULT_ID = window.__POC_CONFIG?.VAULT_ID || '358ff77c-4c0d-4d1a-85a1-b25bde541cd8';
 
 let oneClawToken = null;
 let isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';

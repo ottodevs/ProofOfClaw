@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+interface IERC721Receiver {
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4);
+}
+
 /// @title ProofOfClawINFT
 /// @notice Intelligent NFT contract for Proof of Claw AI agents on 0G Chain
 /// @dev Implements ERC-7857 standard — each agent's identity, policy, and encrypted
@@ -20,6 +24,8 @@ contract ProofOfClawINFT {
         bytes32 riscZeroImageId;   // RISC Zero image commitment
         string  encryptedURI;      // 0G Storage URI for encrypted agent metadata
         bytes32 metadataHash;      // keccak256 of plaintext metadata (integrity check)
+        bytes32 soulBackupHash;    // keccak256 of OCMB v0.1 soul backup YAML — required for continuity
+        string  soulBackupURI;     // 0G Storage URI for encrypted soul backup
         string  ensName;           // Agent's ENS subname
         uint256 reputationScore;   // Cached on-chain reputation
         uint256 totalProofs;       // Number of verified RISC Zero proofs
@@ -38,6 +44,9 @@ contract ProofOfClawINFT {
 
     /// @notice Owner → Operator → Approved
     mapping(address => mapping(address => bool)) private _operatorApprovals;
+
+    /// @notice Owner → token count (O(1) balanceOf)
+    mapping(address => uint256) private _balances;
 
     /// @notice Token ID → Executor → Permissions (ERC-7857 usage authorization)
     mapping(uint256 => mapping(address => bytes)) public usageAuthorizations;
@@ -61,6 +70,8 @@ contract ProofOfClawINFT {
         address indexed owner,
         string ensName
     );
+    event SoulBackupRecorded(uint256 indexed tokenId, bytes32 soulBackupHash, string soulBackupURI);
+    event SoulBackupUpdated(uint256 indexed tokenId, bytes32 newSoulBackupHash, string newSoulBackupURI);
     event ProofRecorded(uint256 indexed tokenId, uint256 totalProofs);
     event ReputationUpdated(uint256 indexed tokenId, uint256 newScore);
 
@@ -73,6 +84,8 @@ contract ProofOfClawINFT {
     error ZeroAddress();
     error OnlyVerifier();
     error OnlyAdmin();
+    error TransferToNonReceiver();
+    error SoulBackupRequired();
 
     // ─── Constructor ────────────────────────────────────────────────────
 
@@ -89,6 +102,8 @@ contract ProofOfClawINFT {
     /// @param riscZeroImageId RISC Zero guest image ID commitment
     /// @param encryptedURI 0G Storage URI containing encrypted agent metadata
     /// @param metadataHash keccak256 of the plaintext metadata for integrity
+    /// @param soulBackupHash keccak256 of the OCMB v0.1 soul backup YAML
+    /// @param soulBackupURI 0G Storage URI for encrypted soul backup
     /// @param ensName Agent's ENS subname (e.g., "alice.proofofclaw.eth")
     /// @return tokenId The minted token ID
     function mint(
@@ -97,9 +112,12 @@ contract ProofOfClawINFT {
         bytes32 riscZeroImageId,
         string calldata encryptedURI,
         bytes32 metadataHash,
+        bytes32 soulBackupHash,
+        string calldata soulBackupURI,
         string calldata ensName
     ) external returns (uint256 tokenId) {
         if (agentToToken[agentId] != 0) revert AgentAlreadyMinted();
+        if (soulBackupHash == bytes32(0)) revert SoulBackupRequired();
 
         tokenId = _nextTokenId++;
 
@@ -110,6 +128,8 @@ contract ProofOfClawINFT {
             riscZeroImageId: riscZeroImageId,
             encryptedURI: encryptedURI,
             metadataHash: metadataHash,
+            soulBackupHash: soulBackupHash,
+            soulBackupURI: soulBackupURI,
             ensName: ensName,
             reputationScore: 0,
             totalProofs: 0,
@@ -118,9 +138,36 @@ contract ProofOfClawINFT {
         });
 
         agentToToken[agentId] = tokenId;
+        _balances[msg.sender]++;
 
         emit Transfer(address(0), msg.sender, tokenId);
         emit AgentMinted(tokenId, agentId, msg.sender, ensName);
+        emit SoulBackupRecorded(tokenId, soulBackupHash, soulBackupURI);
+    }
+
+    // ─── Soul Backup Management ─────────────────────────────────────────
+
+    /// @notice Update an agent's soul backup after identity evolution or reassembly
+    /// @dev The soul backup is the agent's continuity anchor — OCMB v0.1 format
+    function updateSoulBackup(
+        uint256 tokenId,
+        bytes32 newSoulBackupHash,
+        string calldata newSoulBackupURI
+    ) external {
+        AgentINFT storage agent = agents[tokenId];
+        if (agent.owner != msg.sender) revert NotOwner();
+        if (newSoulBackupHash == bytes32(0)) revert SoulBackupRequired();
+
+        agent.soulBackupHash = newSoulBackupHash;
+        agent.soulBackupURI = newSoulBackupURI;
+
+        emit SoulBackupUpdated(tokenId, newSoulBackupHash, newSoulBackupURI);
+    }
+
+    /// @notice Get the soul backup data for an agent (used during reassembly)
+    function getSoulBackup(uint256 tokenId) external view returns (bytes32 backupHash, string memory backupURI) {
+        if (agents[tokenId].owner == address(0)) revert TokenDoesNotExist();
+        return (agents[tokenId].soulBackupHash, agents[tokenId].soulBackupURI);
     }
 
     // ─── ERC-7857: Encrypted Metadata Management ────────────────────────
@@ -178,6 +225,7 @@ contract ProofOfClawINFT {
         if (msg.sender != verifier) revert OnlyVerifier();
 
         AgentINFT storage agent = agents[tokenId];
+        if (agent.owner == address(0)) revert TokenDoesNotExist();
         agent.totalProofs++;
 
         emit ProofRecorded(tokenId, agent.totalProofs);
@@ -187,6 +235,7 @@ contract ProofOfClawINFT {
     /// @dev Called by verifier or admin after aggregating off-chain reputation data
     function updateReputation(uint256 tokenId, uint256 newScore) external {
         if (msg.sender != verifier && msg.sender != admin) revert NotAuthorized();
+        if (agents[tokenId].owner == address(0)) revert TokenDoesNotExist();
 
         agents[tokenId].reputationScore = newScore;
 
@@ -194,6 +243,20 @@ contract ProofOfClawINFT {
     }
 
     // ─── Policy Management ──────────────────────────────────────────────
+
+    /// @notice Update the soul backup (OCMB continuity data)
+    function updateSoulBackup(
+        uint256 tokenId,
+        bytes32 newSoulBackupHash,
+        string calldata newSoulBackupURI
+    ) external {
+        AgentINFT storage agent = agents[tokenId];
+        if (agent.owner != msg.sender) revert NotOwner();
+        if (newSoulBackupHash == bytes32(0)) revert SoulBackupRequired();
+
+        agent.soulBackupHash = newSoulBackupHash;
+        agent.soulBackupURI = newSoulBackupURI;
+    }
 
     /// @notice Update agent's policy hash (after policy change)
     function updatePolicy(uint256 tokenId, bytes32 newPolicyHash) external {
@@ -236,11 +299,9 @@ contract ProofOfClawINFT {
 
     // ─── ERC-721 Core ───────────────────────────────────────────────────
 
-    function balanceOf(address owner) external view returns (uint256 count) {
+    function balanceOf(address owner) external view returns (uint256) {
         if (owner == address(0)) revert ZeroAddress();
-        for (uint256 i = 1; i < _nextTokenId; i++) {
-            if (agents[i].owner == owner) count++;
-        }
+        return _balances[owner];
     }
 
     function ownerOf(uint256 tokenId) external view returns (address) {
@@ -276,10 +337,12 @@ contract ProofOfClawINFT {
 
     function safeTransferFrom(address from, address to, uint256 tokenId) external {
         _transfer(from, to, tokenId);
+        _checkOnERC721Received(from, to, tokenId, "");
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata) external {
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) external {
         _transfer(from, to, tokenId);
+        _checkOnERC721Received(from, to, tokenId, data);
     }
 
     function _transfer(address from, address to, uint256 tokenId) internal {
@@ -292,6 +355,8 @@ contract ProofOfClawINFT {
             || _operatorApprovals[from][msg.sender];
         if (!authorized) revert NotAuthorized();
 
+        _balances[from]--;
+        _balances[to]++;
         agent.owner = to;
         delete _tokenApprovals[tokenId];
 
@@ -302,6 +367,17 @@ contract ProofOfClawINFT {
         return interfaceId == 0x80ac58cd  // ERC-721
             || interfaceId == 0x01ffc9a7  // ERC-165
             || interfaceId == 0x5b5e139f; // ERC-721Metadata
+    }
+
+    /// @dev Checks if `to` is a contract and, if so, calls onERC721Received
+    function _checkOnERC721Received(address from, address to, uint256 tokenId, bytes memory data) internal {
+        if (to.code.length > 0) {
+            try IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data) returns (bytes4 retval) {
+                if (retval != IERC721Receiver.onERC721Received.selector) revert TransferToNonReceiver();
+            } catch {
+                revert TransferToNonReceiver();
+            }
+        }
     }
 
     // ─── Admin ──────────────────────────────────────────────────────────

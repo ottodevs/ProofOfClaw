@@ -27,6 +27,11 @@ pub struct AgentMetadata {
     pub dm3_endpoint: String,
     pub inference_model: String,
     pub version: String,
+    /// SHA-256 hash of the OCMB v0.1 soul backup YAML.
+    /// Required for iNFT minting — agents must have a soul to exist.
+    pub soul_backup_hash: String,
+    /// 0G Storage URI for the encrypted soul backup.
+    pub soul_backup_uri: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +58,8 @@ pub struct INFTData {
     pub risc_zero_image_id: String,
     pub encrypted_uri: String,
     pub metadata_hash: String,
+    pub soul_backup_hash: String,
+    pub soul_backup_uri: String,
     pub ens_name: String,
     pub reputation_score: u64,
     pub total_proofs: u64,
@@ -85,6 +92,8 @@ impl INFTClient {
             dm3_endpoint: config.dm3_delivery_service_url.clone(),
             inference_model: "0g-compute".to_string(),
             version: "1.0.0".to_string(),
+            soul_backup_hash: config.soul_backup_hash.clone().unwrap_or_default(),
+            soul_backup_uri: config.soul_backup_uri.clone().unwrap_or_default(),
         }
     }
 
@@ -127,12 +136,17 @@ impl INFTClient {
     }
 
     /// Build calldata for `ProofOfClawINFT.mint(...)`.
+    ///
+    /// Updated for OCMB v0.1: now includes `soulBackupHash` and `soulBackupURI`
+    /// as required parameters. Agents must have a soul to mint an iNFT.
     pub fn build_mint_calldata(
         agent_id: &str,
         policy_hash: &str,
         risc_zero_image_id: &str,
         encrypted_uri: &str,
         metadata_hash: &str,
+        soul_backup_hash: &str,
+        soul_backup_uri: &str,
         ens_name: &str,
     ) -> Vec<u8> {
         use ethers::abi::{encode, Token};
@@ -144,13 +158,17 @@ impl INFTClient {
             h.finalize()
         };
 
-        let selector = &keccak256(b"mint(bytes32,bytes32,bytes32,string,bytes32,string)")[..4];
+        let selector = &keccak256(
+            b"mint(bytes32,bytes32,bytes32,string,bytes32,bytes32,string,string)",
+        )[..4];
         let encoded = encode(&[
             Token::FixedBytes(agent_hash.to_vec()),
             Token::FixedBytes(hex_to_bytes32(policy_hash).to_vec()),
             Token::FixedBytes(hex_to_bytes32(risc_zero_image_id).to_vec()),
             Token::String(encrypted_uri.to_string()),
             Token::FixedBytes(hex_to_bytes32(metadata_hash).to_vec()),
+            Token::FixedBytes(hex_to_bytes32(soul_backup_hash).to_vec()),
+            Token::String(soul_backup_uri.to_string()),
             Token::String(ens_name.to_string()),
         ]);
 

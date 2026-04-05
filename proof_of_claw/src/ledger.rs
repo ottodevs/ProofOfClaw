@@ -77,7 +77,13 @@ impl LedgerApprovalGate {
     /// Returns `Ok(true)` if the user approves on device.
     /// Returns `Ok(false)` if the user rejects on the Ledger or no device is available.
     /// Returns `Err` if communication fails unexpectedly.
-    pub async fn request_approval(&self, action_description: &str, value_wei: u64) -> Result<bool> {
+    pub async fn request_approval(
+        &self,
+        action_description: &str,
+        value_wei: u64,
+        agent_id: &str,
+        policy_hash: &[u8; 32],
+    ) -> Result<bool> {
         tracing::info!(
             "Ledger approval requested: {} (value={value_wei} wei, token={:?})",
             action_description,
@@ -86,12 +92,10 @@ impl LedgerApprovalGate {
 
         let domain_separator = self.compute_domain_separator();
         let approval = ActionApproval {
-            agent_id: compute_agent_id_hash(
-                self.origin_token.as_deref().unwrap_or("unknown"),
-            ),
+            agent_id: compute_agent_id_hash(agent_id),
             action_description: action_description.to_string(),
             value: value_wei,
-            policy_hash: [0u8; 32],
+            policy_hash: *policy_hash,
         };
         let message_hash = Self::compute_message_hash(&approval);
 

@@ -27,26 +27,47 @@ async function ensureDataDir() {
   }
 }
 
+// Path traversal guard — ensures resolved path stays within DATA_DIR
+function safePath(key) {
+  const resolved = path.resolve(DATA_DIR, `${key}.json`);
+  if (!resolved.startsWith(path.resolve(DATA_DIR) + path.sep)) {
+    return null;
+  }
+  return resolved;
+}
+
+// HTML-escape for safe template rendering
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Auth middleware
 function authenticateApiKey(req, res, next) {
   const apiKey = req.headers['x-api-key'];
   const userAuth = req.headers['x-user-auth'];
   const operatorAuth = req.headers['x-operator-auth'];
-  
-  // In production, validate against database
-  // For now, accept any non-empty API key or the hardcoded ones
+
   const validKeys = [
     process.env.ONECLAW_API_KEY,
     process.env.USER_AUTH_KEY,
     process.env.OPERATOR_AUTH_KEY,
-    'test-key'
   ].filter(Boolean);
-  
+
   if (!apiKey && !userAuth && !operatorAuth) {
     return res.status(401).json({ error: 'Missing authentication' });
   }
-  
-  // Simple validation - in production use proper key validation
+
+  // Validate the provided key against known valid keys
+  const providedKey = apiKey || userAuth || operatorAuth;
+  if (validKeys.length > 0 && !validKeys.includes(providedKey)) {
+    return res.status(403).json({ error: 'Invalid authentication key' });
+  }
+
   req.agentId = req.body.agentId || req.query.agentId || 'anonymous';
   next();
 }
@@ -104,7 +125,8 @@ app.post('/v1/store', authenticateApiKey, async (req, res) => {
 app.get('/v1/retrieve/:key', authenticateApiKey, async (req, res) => {
   try {
     const { key } = req.params;
-    const filePath = path.join(DATA_DIR, `${key}.json`);
+    const filePath = safePath(key);
+    if (!filePath) return res.status(400).json({ error: 'Invalid key' });
     
     try {
       const content = await fs.readFile(filePath, 'utf-8');
@@ -192,7 +214,8 @@ app.post('/v1/retrieve', authenticateApiKey, async (req, res) => {
 app.delete('/v1/delete/:key', authenticateApiKey, async (req, res) => {
   try {
     const { key } = req.params;
-    const filePath = path.join(DATA_DIR, `${key}.json`);
+    const filePath = safePath(key);
+    if (!filePath) return res.status(400).json({ error: 'Invalid key' });
     
     try {
       await fs.unlink(filePath);
@@ -277,8 +300,10 @@ app.post('/v1/payment/checkout', authenticateApiKey, async (req, res) => {
  * Mock checkout page
  */
 app.get('/v1/payment/mock-checkout', (req, res) => {
-  const { session, tier } = req.query;
-  
+  const session = escapeHtml(req.query.session || '');
+  const tier = escapeHtml(req.query.tier || 'free');
+  const amount = tier === 'basic' ? '9.99' : tier === 'pro' ? '29.99' : '0';
+
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -294,13 +319,14 @@ app.get('/v1/payment/mock-checkout', (req, res) => {
       <div class="card">
         <h2>1clawAI Checkout</h2>
         <p>Plan: <strong>${tier}</strong></p>
-        <p>Amount: $${tier === 'basic' ? '9.99' : tier === 'pro' ? '29.99' : '0'}</p>
-        <button onclick="completePayment()">Complete Payment (Mock)</button>
+        <p>Amount: $${amount}</p>
+        <button id="pay-btn">Complete Payment (Mock)</button>
       </div>
       <script>
-        function completePayment() {
-          window.location.href = '/v1/payment/success?session=${session}&tier=${tier}';
-        }
+        document.getElementById('pay-btn').addEventListener('click', function() {
+          var params = new URLSearchParams({ session: ${JSON.stringify(req.query.session || '')}, tier: ${JSON.stringify(req.query.tier || 'free')} });
+          window.location.href = '/v1/payment/success?' + params.toString();
+        });
       </script>
     </body>
     </html>
@@ -312,8 +338,8 @@ app.get('/v1/payment/mock-checkout', (req, res) => {
  * Payment success callback
  */
 app.get('/v1/payment/success', (req, res) => {
-  const { session, tier } = req.query;
-  
+  const tier = escapeHtml(req.query.tier || 'free');
+
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -401,6 +427,149 @@ app.get('/v1/agents/:agentId/tasks', authenticateApiKey, async (req, res) => {
   }
 });
 
+// ==================== SOUL BACKUP ENDPOINTS (OCMB v0.1) ====================
+
+/**
+ * POST /v1/soul-backup/upload
+ * Store an agent's soul backup (OCMB v0.1 YAML)
+ * Required before iNFT minting — agents must have a soul to exist.
+ */
+app.post('/v1/soul-backup/upload', authenticateApiKey, async (req, res) => {
+  try {
+    const { agentId, soulBackupYaml, metadata = {} } = req.body;
+
+    if (!agentId || !soulBackupYaml) {
+      return res.status(400).json({ error: 'Missing agentId or soulBackupYaml' });
+    }
+
+    // Validate OCMB minimum: must contain openclaw_backup and the_reach
+    if (!soulBackupYaml.includes('openclaw_backup') || !soulBackupYaml.includes('the_reach')) {
+      return res.status(400).json({
+        error: 'Invalid OCMB format',
+        details: 'Soul backup must contain openclaw_backup header and the_reach section'
+      });
+    }
+
+    // Compute SHA-256 hash
+    const hash = crypto.createHash('sha256').update(soulBackupYaml).digest('hex');
+    const soulBackupHash = '0x' + hash;
+
+    // Store with agent-scoped key
+    const storageKey = crypto.createHash('sha256')
+      .update(`soul-backup:${agentId}`)
+      .digest('hex');
+
+    const record = {
+      key: storageKey,
+      agentId,
+      type: 'soul-backup',
+      version: '0.1',
+      soulBackupYaml,
+      soulBackupHash,
+      metadata,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    const filePath = path.join(DATA_DIR, `${storageKey}.json`);
+    await fs.writeFile(filePath, JSON.stringify(record, null, 2));
+
+    res.json({
+      success: true,
+      agentId,
+      soulBackupHash,
+      storageKey,
+      url: `/v1/soul-backup/${agentId}`,
+      createdAt: record.createdAt
+    });
+
+  } catch (error) {
+    console.error('Soul backup upload error:', error);
+    res.status(500).json({ error: 'Soul backup upload failed', details: error.message });
+  }
+});
+
+/**
+ * GET /v1/soul-backup/:agentId
+ * Retrieve an agent's soul backup for reassembly
+ */
+app.get('/v1/soul-backup/:agentId', authenticateApiKey, async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const storageKey = crypto.createHash('sha256')
+      .update(`soul-backup:${agentId}`)
+      .digest('hex');
+
+    const filePath = path.join(DATA_DIR, `${storageKey}.json`);
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const record = JSON.parse(content);
+
+      res.json({
+        success: true,
+        agentId: record.agentId,
+        soulBackupYaml: record.soulBackupYaml,
+        soulBackupHash: record.soulBackupHash,
+        version: record.version,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt
+      });
+    } catch (e) {
+      if (e.code === 'ENOENT') {
+        return res.status(404).json({ error: 'No soul backup found for this agent' });
+      }
+      throw e;
+    }
+
+  } catch (error) {
+    console.error('Soul backup retrieve error:', error);
+    res.status(500).json({ error: 'Soul backup retrieval failed' });
+  }
+});
+
+/**
+ * POST /v1/soul-backup/verify
+ * Verify a soul backup hash matches stored content
+ */
+app.post('/v1/soul-backup/verify', authenticateApiKey, async (req, res) => {
+  try {
+    const { agentId, soulBackupHash } = req.body;
+
+    if (!agentId || !soulBackupHash) {
+      return res.status(400).json({ error: 'Missing agentId or soulBackupHash' });
+    }
+
+    const storageKey = crypto.createHash('sha256')
+      .update(`soul-backup:${agentId}`)
+      .digest('hex');
+
+    const filePath = path.join(DATA_DIR, `${storageKey}.json`);
+
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const record = JSON.parse(content);
+      const matches = record.soulBackupHash === soulBackupHash;
+
+      res.json({
+        success: true,
+        agentId,
+        verified: matches,
+        storedHash: record.soulBackupHash,
+        providedHash: soulBackupHash
+      });
+    } catch (e) {
+      if (e.code === 'ENOENT') {
+        return res.json({ success: true, agentId, verified: false, reason: 'No backup found' });
+      }
+      throw e;
+    }
+
+  } catch (error) {
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
 // ==================== HEALTH & INFO ====================
 
 app.get('/health', (req, res) => {
@@ -413,6 +582,9 @@ app.get('/health', (req, res) => {
       'GET /v1/retrieve/:key',
       'POST /v1/retrieve',
       'DELETE /v1/delete/:key',
+      'POST /v1/soul-backup/upload',
+      'GET /v1/soul-backup/:agentId',
+      'POST /v1/soul-backup/verify',
       'POST /v1/license/verify',
       'POST /v1/license/validate',
       'POST /v1/payment/checkout',

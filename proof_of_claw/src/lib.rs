@@ -15,12 +15,13 @@
 //! Register the POC hooks with an ironclaw `HookRegistry`:
 //!
 //! ```ignore
-//! use proof_of_claw::{IronClawAdapter, InjectionDetectionHook, PolicyEnforcementHook, ProofGenerationHook};
+//! use proof_of_claw::{IronClawAdapter, InjectionDetectionHook, PolicyEnforcementHook, ProofGenerationHook, InferenceAttestationHook};
 //! use std::sync::Arc;
 //!
 //! let adapter = Arc::new(IronClawAdapter::new(config).await?);
 //! registry.register(Arc::new(InjectionDetectionHook::new(adapter.injection_detector.clone()))).await;
-//! registry.register(Arc::new(PolicyEnforcementHook::new(adapter.policy_engine.clone()))).await;
+//! registry.register(Arc::new(PolicyEnforcementHook::new(adapter.policy_engine.clone(), adapter.clone()))).await;
+//! registry.register(Arc::new(InferenceAttestationHook::new(adapter.clone()))).await;
 //! registry.register(Arc::new(ProofGenerationHook::new(adapter.clone()))).await;
 //! ```
 
@@ -45,6 +46,10 @@ pub mod ironclaw_adapter;
 // Re-exports for convenience
 pub use config::{AgentConfig, PolicyConfig};
 pub use injection_detector::InjectionDetector;
+pub use ironclaw_adapter::{
+    InferenceAttestationHook, InjectionDetectionHook, IronClawAdapter, PolicyEnforcementHook,
+    ProofGenerationHook, SessionState,
+};
 pub use policy_engine::PolicyEngine;
 pub use proof_generator::ProofGenerator;
 pub use registry::{compute_capability_hash, Tool, ToolRegistry};

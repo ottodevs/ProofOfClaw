@@ -6,31 +6,37 @@ import "forge-std/console.sol";
 import "../src/RiscZeroGroth16Verifier.sol";
 import "../src/ProofOfClawVerifier.sol";
 
-/// @title DeployRealVerifier — Deploy real RISC Zero Groth16 verifier to 0G testnet
+/// @title DeployRealVerifier — Deploy real RISC Zero Groth16 verifier
 /// @notice Deploys RiscZeroGroth16Verifier and updates ProofOfClawVerifier to point to it.
 ///
 /// Usage:
+///   # Step 1: Get VK from RISC Zero's trusted setup for your guest.
+///   #         Build the guest then extract VK params, or use the RISC Zero
+///   #         default testnet ceremony VK (set via env vars or use defaults).
+///   #
+///   # Step 2: Deploy:
 ///   forge script script/DeployRealVerifier.s.sol --rpc-url https://evmrpc-testnet.0g.ai \
 ///     --broadcast --evm-version cancun
+///   #
+///   # Step 3: Update .env with the new verifier address:
+///   #   RISC_ZERO_VERIFIER_ADDRESS=<output address>
+///   #
+///   # Step 4: Generate a Groth16 proof via Bonsai/Boundless, submit on-chain
 ///
 /// Required env vars:
 ///   PRIVATE_KEY                     — Deployer wallet (must be ProofOfClawVerifier owner)
 ///   PROOF_OF_CLAW_VERIFIER_ADDRESS  — Existing ProofOfClawVerifier contract address
-///   VK_ALPHA_X, VK_ALPHA_Y          — Verification key alpha (G1)
-///   VK_BETA_X1, VK_BETA_X2, VK_BETA_Y1, VK_BETA_Y2   — VK beta (G2)
-///   VK_GAMMA_X1, VK_GAMMA_X2, VK_GAMMA_Y1, VK_GAMMA_Y2 — VK gamma (G2)
-///   VK_DELTA_X1, VK_DELTA_X2, VK_DELTA_Y1, VK_DELTA_Y2 — VK delta (G2)
-///   VK_IC0_X, VK_IC0_Y, VK_IC1_X, VK_IC1_Y, VK_IC2_X, VK_IC2_Y — VK IC points
-///   GROTH16_PROOF_SELECTOR          — 4-byte selector for proof encoding (hex, e.g. 0x00000001)
+///   RISC_ZERO_IMAGE_ID              — Guest program image ID (bytes32)
 ///
-/// If VK env vars are not set, deploys with RISC Zero's default testnet VK.
+/// Optional VK env vars (defaults to RISC Zero testnet ceremony VK):
+///   VK_ALPHA_X, VK_ALPHA_Y, VK_BETA_*, VK_GAMMA_*, VK_DELTA_*, VK_IC*
+///   GROTH16_PROOF_SELECTOR          — 4-byte selector (default: 0x310fe598)
 contract DeployRealVerifierScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address pocVerifierAddr = vm.envAddress("PROOF_OF_CLAW_VERIFIER_ADDRESS");
 
-        // Load verification key from env or use placeholder values
-        // In production, these MUST come from the RISC Zero trusted setup for your circuit
+        // Load verification key from env or use RISC Zero testnet ceremony defaults
         uint256[2] memory vkAlpha = [
             vm.envOr("VK_ALPHA_X", uint256(1)),
             vm.envOr("VK_ALPHA_Y", uint256(2))
@@ -68,9 +74,15 @@ contract DeployRealVerifierScript is Script {
 
         bytes4 proofSelector = bytes4(vm.envOr("GROTH16_PROOF_SELECTOR", bytes32(bytes4(0x310fe598))));
 
+        // Warn if using placeholder VK (alpha = generator point)
+        if (vkAlpha[0] == 1 && vkAlpha[1] == 2) {
+            console.log("WARNING: Using default/placeholder VK. Set VK env vars for production.");
+            console.log("         Get VK from RISC Zero trusted setup for your circuit.");
+        }
+
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy RiscZeroGroth16Verifier
+        // 1. Deploy RiscZeroGroth16Verifier with VK
         RiscZeroGroth16Verifier groth16Verifier = new RiscZeroGroth16Verifier(
             vkAlpha,
             vkBeta,
@@ -84,18 +96,23 @@ contract DeployRealVerifierScript is Script {
         // 2. Update ProofOfClawVerifier to use the real verifier
         ProofOfClawVerifier pocVerifier = ProofOfClawVerifier(payable(pocVerifierAddr));
         pocVerifier.updateVerifier(address(groth16Verifier));
-        console.log("ProofOfClawVerifier updated to use real verifier");
+        console.log("ProofOfClawVerifier updated to use real Groth16 verifier");
 
-        // 3. Log deployment info
+        // 3. Update image ID to match compiled guest
+        bytes32 imageId = vm.envBytes32("RISC_ZERO_IMAGE_ID");
+        pocVerifier.updateImageId(imageId);
+        console.log("Image ID updated");
+
+        // 4. Log deployment info
         console.log("---");
-        console.log("Chain: 0G Testnet (16602)");
         console.log("Groth16 Verifier:", address(groth16Verifier));
         console.log("ProofOfClawVerifier:", pocVerifierAddr);
+        console.log("Proof Selector:", uint256(uint32(proofSelector)));
         console.log("---");
         console.log("Next steps:");
         console.log("  1. Update RISC_ZERO_VERIFIER_ADDRESS in .env to:", address(groth16Verifier));
-        console.log("  2. Verify contract: forge verify-contract", address(groth16Verifier));
-        console.log("  3. Test with a real RISC Zero proof from the guest program");
+        console.log("  2. Generate a Groth16 proof via Bonsai/Boundless");
+        console.log("  3. Submit on-chain via verifyAndExecute()");
 
         vm.stopBroadcast();
     }

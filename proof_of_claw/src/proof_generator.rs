@@ -10,7 +10,7 @@
 use crate::config::AgentConfig;
 use crate::types::{ExecutionTrace, ProofReceipt, VerifiedOutput};
 use anyhow::{Context, Result};
-use risc0_zkvm::{default_prover, ExecutorEnv};
+use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -214,7 +214,7 @@ impl ProofGenerator {
                 .with_context(|| format!("failed to read guest ELF from {path}"))
         } else {
             let default_path =
-                "zkvm/guest/target/riscv32im-risc0-zkvm-elf/release/proof-of-claw-guest";
+                "zkvm/target/riscv32im-risc0-zkvm-elf/release/proof-of-claw-guest";
             match std::fs::read(default_path) {
                 Ok(elf) => Ok(elf),
                 Err(_) => {
@@ -259,10 +259,20 @@ impl ProofGenerator {
             .context("failed to build executor env")?;
 
         let prover = default_prover();
-        let receipt = prover
-            .prove(env, &self.guest_elf)
-            .context("RISC Zero local proving failed")?;
 
+        // Use Groth16 if Bonsai is configured, otherwise STARK
+        let prove_info = if std::env::var("BONSAI_API_KEY").is_ok() {
+            tracing::info!("Bonsai API key found — generating Groth16 proof");
+            prover
+                .prove_with_opts(env, &self.guest_elf, &ProverOpts::groth16())
+                .context("RISC Zero Groth16 proving failed (Bonsai)")?
+        } else {
+            prover
+                .prove(env, &self.guest_elf)
+                .context("RISC Zero local STARK proving failed")?
+        };
+
+        let receipt = prove_info.receipt;
         let journal_bytes = receipt.journal.bytes.clone();
         let seal = bincode::serialize(&receipt)
             .context("failed to serialize receipt as seal")?;
