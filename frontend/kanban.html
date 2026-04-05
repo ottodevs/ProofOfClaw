@@ -852,9 +852,9 @@ function loadDemoTasks() {
   console.log('[kanban] Loaded 5 synthetic demo tasks');
 }
 
-// Store original renderCard
-const originalRenderCard = renderCard;
-window.renderCard = function(card, id) {
+// Store reference to original renderCard, then override the function itself
+const _originalRenderCard = renderCard;
+renderCard = function(card, id) {
   if (card.demo) {
     const cls = toolClass(card.tool_name);
     return `<div class="card demo-card" id="card-${id}">
@@ -874,7 +874,7 @@ window.renderCard = function(card, id) {
       <div class="zk-result" id="zk-${id}" style="display:none"></div>
     </div>`;
   }
-  return originalRenderCard(card, id);
+  return _originalRenderCard(card, id);
 };
 
 // Demo verification function
