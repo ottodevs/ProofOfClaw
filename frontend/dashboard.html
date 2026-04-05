@@ -797,6 +797,14 @@ body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); 
         <span class="metric-label">Policy Hash</span>
         <span class="metric-value hash" id="metric-policy-hash">---</span>
       </div>
+      <div class="metric">
+        <span class="metric-label">Wallet Balance</span>
+        <span class="metric-value" id="metric-balance" style="color:var(--text-dim);">---</span>
+      </div>
+      <div class="metric" id="metric-live-row" style="display:none;">
+        <span class="metric-label">Connection</span>
+        <span class="metric-value" id="metric-live-label" style="color:var(--green);font-size:0.75rem;">&#11044; Live API</span>
+      </div>
       <div id="agent-url-metric" style="display:none;margin-top:12px;padding:10px;background:rgba(0,229,255,0.04);border:1px solid var(--border-cyan);border-radius:6px;">
         <div style="font-size:9px;color:var(--cyan-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Messaging URL</div>
         <div style="display:flex;gap:6px;">
