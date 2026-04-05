@@ -48,7 +48,10 @@
       "Bash(grep -l \"abi\\\\|ProofOfClaw\\\\|verifier\" /home/god/ProofOfClaw/ProofOfClaw/frontend/*.js)",
       "Bash(grep -r \"proofs\\\\.html\\\\|proofs\\\\|Proofs\" /home/god/ProofOfClaw/ProofOfClaw/frontend/*.html)",
       "Bash(ls /home/god/ProofOfClaw/ProofOfClaw/.env*)",
-      "Bash(node -c sanitize.js)"
+      "Bash(node -c sanitize.js)",
+      "Bash(grep -E \"\\\\.\\(js|ts|py|rs\\)$\")",
+      "Bash(grep -rn \"kanban\\\\|board\\\\|column\\\\|card\" /home/god/ProofOfClaw/ProofOfClaw/frontend/*.css)",
+      "Bash(python3)"
     ]
   }
 }

@@ -1639,6 +1639,24 @@ curl http://localhost:8420/health
 // Response: { "success": true, "message_id": "msg-002", "timestamp": 1712234567 }</code></pre>
 </div>
 
+<div class="code-block fade-in">
+<div class="code-header"><span>GET /api/traces/stream (SSE)</span></div>
+<pre><code>// Server-Sent Events endpoint — powers the ZK Kanban board.
+// Each /api/chat call emits tool_invocation events followed by a proof_receipt.
+
+event: trace
+data: { "event": "connected", "agent_id": "my-agent", "session_id": "..." }
+
+event: trace
+data: { "event": "tool_invocation", "tool_name": "grep_search",
+        "input_hash": "0xabc...", "output_hash": "0xdef...",
+        "within_policy": true, "timestamp": 1712234567 }
+
+event: trace
+data: { "event": "proof_receipt", "proof_id": "0x...",
+        "journal_b64": "...", "seal_b64": "...", "image_id": "0x..." }</code></pre>
+</div>
+
 <h3 class="fade-in" style="margin-top:24px;">CORS Requirements</h3>
 <p class="fade-in" style="font-size:13px;color:var(--text-secondary);">Since the Proof of Claw frontend is a static site, your agent must return CORS headers:</p>
 <div class="code-block fade-in">

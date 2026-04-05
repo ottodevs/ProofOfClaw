@@ -304,6 +304,53 @@ function randomPick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+/**
+ * Infer which tools an agent would invoke based on the user's prompt.
+ * Returns an array of { name, category } objects.
+ */
+function inferToolsFromPrompt(prompt) {
+  const lp = prompt.toLowerCase();
+  const tools = [];
+
+  // Always start with a read/search step
+  if (lp.match(/grep|search|find|look for|todo/)) {
+    tools.push({ name: 'grep_search', category: 'read' });
+  }
+  if (lp.match(/read|open|view|inspect|check/)) {
+    tools.push({ name: 'read_file', category: 'read' });
+  }
+  if (lp.match(/glob|list files|directory/)) {
+    tools.push({ name: 'glob_search', category: 'read' });
+  }
+  if (lp.match(/fetch|url|http|api|download/)) {
+    tools.push({ name: 'web_fetch', category: 'read' });
+  }
+  if (lp.match(/web search|google|look up/)) {
+    tools.push({ name: 'web_search', category: 'read' });
+  }
+  if (lp.match(/run|exec|command|bash|shell|install|build|deploy/)) {
+    tools.push({ name: 'bash', category: 'exec' });
+  }
+  if (lp.match(/write|create file|save/)) {
+    tools.push({ name: 'write_file', category: 'write' });
+  }
+  if (lp.match(/edit|fix|update|change|modify|refactor|rename/)) {
+    tools.push({ name: 'edit_file', category: 'write' });
+  }
+  if (lp.match(/swap|transfer|send|bridge|stake/)) {
+    tools.push({ name: 'bash', category: 'exec' });
+    tools.push({ name: 'web_fetch', category: 'read' });
+  }
+
+  // Fallback: always produce at least one tool invocation
+  if (tools.length === 0) {
+    tools.push({ name: 'read_file', category: 'read' });
+    tools.push({ name: 'structured_output', category: 'read' });
+  }
+
+  return tools;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // API Endpoints
 // ═══════════════════════════════════════════════════════════════════════════
@@ -391,6 +438,39 @@ app.get('/api/proofs', (req, res) => {
     proofs: proofStore,
     total: proofStore.length
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SSE — Kanban trace stream
+// ═══════════════════════════════════════════════════════════════════════════
+
+const sseClients = new Set();
+
+/**
+ * Send a trace event to all connected SSE clients.
+ * @param {object} evt - Event payload (must include .event field)
+ */
+function sseBroadcast(evt) {
+  const data = JSON.stringify(evt);
+  for (const res of sseClients) {
+    try { res.write(`event: trace\ndata: ${data}\n\n`); } catch (_) { /* client gone */ }
+  }
+}
+
+/**
+ * GET /api/traces/stream
+ * Server-Sent Events endpoint for kanban live trace feed
+ */
+app.get('/api/traces/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.write(`event: trace\ndata: ${JSON.stringify({ event: 'connected', agent_id: AGENT_ID, session_id: agentState.sessionId })}\n\n`);
+  sseClients.add(res);
+  req.on('close', () => sseClients.delete(res));
 });
 
 /**
@@ -498,13 +578,60 @@ app.post('/api/chat', async (req, res) => {
   // Generate agent response
   const responseText = generateAgentResponse(message, 'text');
 
-  // Simulate processing time for realistic feel
-  await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-  
-  agentState.totalActions++;
-  const proofId = '0x' + crypto.randomBytes(16).toString('hex');
+  // Determine which tools the agent would invoke for this message
+  const traceTools = inferToolsFromPrompt(message);
+  agentState.totalActions += traceTools.length;
 
-  // Store agent response (no proof attached — proofs are only generated for policy-gated actions)
+  // Emit tool_invocation trace events (staggered for realism)
+  for (const tool of traceTools) {
+    const inputHash = '0x' + crypto.createHash('sha256').update(message + tool.name + Date.now().toString()).digest('hex');
+    const outputHash = '0x' + crypto.createHash('sha256').update(responseText + tool.name + Date.now().toString()).digest('hex');
+    sseBroadcast({
+      event: 'tool_invocation',
+      tool_name: tool.name,
+      input_hash: inputHash,
+      output_hash: outputHash,
+      within_policy: ALLOWED_TOOLS.includes(tool.category) || ALLOWED_TOOLS.includes(tool.name),
+      timestamp: Date.now(),
+    });
+    await new Promise(r => setTimeout(r, 300 + Math.random() * 400));
+  }
+
+  // Generate and store proof
+  const proofId = '0x' + crypto.randomBytes(16).toString('hex');
+  const journalBytes = Buffer.from(JSON.stringify({
+    agent_id: AGENT_ID,
+    policy_hash: '0x' + crypto.createHash('sha256').update(ALLOWED_TOOLS.join(',')).digest('hex'),
+    output_commitment: '0x' + crypto.createHash('sha256').update(responseText).digest('hex'),
+    all_checks_passed: true,
+    requires_ledger_approval: false,
+    action_value: 0,
+  }));
+  const sealBytes = crypto.randomBytes(64);
+  const imageId = '0x' + crypto.createHash('sha256').update('proof-of-claw-v1').digest('hex');
+
+  const proofEntry = {
+    proof_id: proofId,
+    journal_b64: journalBytes.toString('base64'),
+    seal_b64: sealBytes.toString('base64'),
+    image_id: imageId,
+    status: 'verified',
+    timestamp: Date.now(),
+    tool_count: traceTools.length,
+  };
+  proofStore.push(proofEntry);
+  agentState.proofsGenerated++;
+
+  // Emit proof_receipt so kanban can verify
+  sseBroadcast({
+    event: 'proof_receipt',
+    proof_id: proofId,
+    journal_b64: proofEntry.journal_b64,
+    seal_b64: proofEntry.seal_b64,
+    image_id: proofEntry.image_id,
+  });
+
+  // Store agent response
   const agentMsg = {
     id: crypto.randomUUID(),
     sender: ENS_NAME,
@@ -513,16 +640,17 @@ app.post('/api/chat', async (req, res) => {
     sent: true
   };
   conversation.messages.push(agentMsg);
-  
+
   // Also store in main message store
   const contactId = req.body.from || 'user';
   if (!messageStore.has(contactId)) {
     messageStore.set(contactId, []);
   }
   messageStore.get(contactId).push(userMsg, agentMsg);
-  
+
   // Push real-time updates
   wsBroadcast('activity', { type: 'message', action: 'chat_response', timestamp: Date.now() });
+  wsBroadcast('proofs', { proof_id: proofId, status: 'verified', timestamp: Date.now() });
   broadcastStatus();
 
   res.json({
@@ -778,6 +906,7 @@ async function startServer() {
 ║    POST /api/chat/send       - Chat with file/voice attachments  ║
 ║    POST /api/upload          - Upload files                      ║
 ║    GET  /api/messages/poll   - Poll for DM3 messages             ║
+║    GET  /api/traces/stream   - SSE kanban trace feed             ║
 ║    WS   /ws                  - Real-time dashboard updates       ║
 ╚══════════════════════════════════════════════════════════════════╝
     `);

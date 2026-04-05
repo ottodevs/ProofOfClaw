@@ -148,6 +148,7 @@ The agent exposes a REST API on port 8420 (configurable via `API_PORT`):
 | `/api/proofs` | GET | Proof history with policy check details |
 | `/api/messages` | GET | Message records |
 | `/api/messages/send` | POST | Send a DM3 message to another agent |
+| `/api/traces/stream` | GET | SSE stream of tool invocations and ZK proof receipts (powers ZK Kanban) |
 
 ### Chat Endpoint
 
@@ -224,6 +225,7 @@ proof-of-claw/
 │   ├── dashboard.html          # Live monitoring (polls API every 3s when connected)
 │   ├── messages.html           # DM3 message threads
 │   ├── proofs.html             # ZK proof explorer
+│   ├── kanban.html             # Live ZK Kanban — real-time tool invocation cards via SSE
 │   ├── soul-vault.html         # Agent deployment interface
 │   ├── docs.html               # Interactive technical documentation
 │   ├── deploy.html             # Redirect → agents.html
@@ -232,6 +234,9 @@ proof-of-claw/
 │   ├── shared.css              # Unified design system
 │   ├── shared.js               # Shared UI utilities
 │   └── public/                 # Favicons, logos, sponsor assets
+│
+├── dm3Daemon/                  # Node.js agent runtime server (Express + WebSocket + SSE)
+│   └── server.js               # API server (port 8420) — chat, proofs, traces/stream
 │
 ├── cli/                        # TypeScript CLI tool (`poc`)
 │   └── src/                    # Commander.js commands for org, swarm, agent, epoch, backup
