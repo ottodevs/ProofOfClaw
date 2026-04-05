@@ -598,92 +598,68 @@
 <script src="wallet.js"></script>
 <script src="shared.js"></script>
 <script>
-// ===================== DATA =====================
-const PROOFS = [
-  {
-    id: '1234',
-    agent: 'alice-agent',
-    action: 'swap_tokens',
-    value: 100,
-    currency: 'USDC',
-    approval: 'Autonomous',
-    timestamp: '2026-04-03 16:45:32 UTC',
-    proofTime: '42s (Boundless)',
-    proofTimeNum: 42,
-    status: 'verified',
-    commitment: '0xabcd1234ef567890abcd1234ef567890abcd1234ef567890abcd1234ef567890',
-    policyChecks: [
-      { rule: 'Tool Allowlist', detail: 'swap_tokens is in allowed tools list', pass: true },
-      { rule: 'Value Threshold', detail: '100 USDC \u2264 100 USDC autonomous limit', pass: true },
-      { rule: 'Endpoint Allowlist', detail: 'api.uniswap.org is approved', pass: true },
-      { rule: 'Prompt Injection', detail: 'No injection patterns detected', pass: true }
-    ],
-    verifiedOutput: {
-      agent_id: 'alice-agent',
-      policy_hash: '0x1234...5678',
-      output_commitment: '0xabcd...7890',
-      all_checks_passed: true,
-      requires_ledger_approval: false,
-      action_value: 100000000
-    },
-    txHash: '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba',
-    blockNumber: '12,345,678'
-  },
-  {
-    id: '1235',
-    agent: 'alice-agent',
-    action: 'transfer',
-    value: 500,
-    currency: 'USDC',
-    approval: 'Ledger Approved',
-    timestamp: '2026-04-03 16:30:15 UTC',
-    proofTime: '38s (Boundless)',
-    proofTimeNum: 38,
-    status: 'verified',
-    commitment: '0xef012345ab678901ef012345ab678901ef012345ab678901ef012345ab678901',
-    policyChecks: [
-      { rule: 'Tool Allowlist', detail: 'transfer is in allowed tools list', pass: true },
-      { rule: 'Value Threshold', detail: '500 USDC > 100 USDC \u2192 Ledger approval required', pass: true },
-      { rule: 'Endpoint Allowlist', detail: 'api.aave.com is approved', pass: true },
-      { rule: 'Prompt Injection', detail: 'No injection patterns detected', pass: true }
-    ],
-    verifiedOutput: {
-      agent_id: 'alice-agent',
-      policy_hash: '0x1234...5678',
-      output_commitment: '0xef01...8901',
-      all_checks_passed: true,
-      requires_ledger_approval: true,
-      action_value: 500000000
-    },
-    txHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-    blockNumber: '12,345,650'
-  },
-  {
-    id: '1236',
-    agent: 'alice-agent',
-    action: 'query',
-    value: 0,
-    currency: 'USDC',
-    approval: 'Autonomous',
-    timestamp: '2026-04-03 16:50:00 UTC',
-    proofTime: '~15s remaining',
-    proofTimeNum: null,
-    status: 'pending',
-    commitment: '0x5678abcd9012ef345678abcd9012ef345678abcd9012ef345678abcd9012ef34',
-    policyChecks: [
-      { rule: 'Tool Allowlist', detail: 'query is in allowed tools list', pass: true },
-      { rule: 'Value Threshold', detail: '0 USDC \u2264 100 USDC autonomous limit', pass: true },
-      { rule: 'Endpoint Allowlist', detail: 'api.coingecko.com is approved', pass: true },
-      { rule: 'Prompt Injection', detail: 'No injection patterns detected', pass: true }
-    ],
-    verifiedOutput: null,
-    txHash: null,
-    blockNumber: null
-  }
+// ===================== 0G TESTNET EXPLORER API =====================
+const EXPLORER_API = 'https://chainscan-dev.0g.ai/api';
+
+// Your wallet transactions on 0G Testnet
+const WALLET_ADDRESS = '0x116C...d90e'; // Shortened for display
+const TRANSACTIONS = [
+  '0x436491eaa0c9f3929e2ea33b0ab4bbb0eb30d9c8770d2af8553aadb9ca94bab9',
+  '0x0ec0ea4b29375f425669d30a497cd7dde84512dd576a73cf034bf5560a8aaaec',
+  '0x4be91d56385e3d1c8af547eaa2f98e4c7f0fc099e6973a2776b0f2db7eaf430c',
+  '0x2164cb53df0baf5e9779e868ac6958a2ec5d7f828373e86ccb0891c2d28fa701'
 ];
 
-// ===================== STATE =====================
-let proofs = JSON.parse(JSON.stringify(PROOFS));
+/**
+ * Fetch transaction details from 0G Testnet explorer
+ * @param {string} txHash - Transaction hash
+ * @returns {Promise<Object>} Transaction data
+ */
+async function fetchTransaction(txHash) {
+  try {
+    const response = await fetch(`${EXPLORER_API}?module=transaction&action=gettxinfo&txhash=${txHash}`);
+    const data = await response.json();
+    if (data.status === '1' && data.result) {
+      return data.result;
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch transaction:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetch all transactions for the wallet from 0G Testnet
+ * @returns {Promise<Array>} Array of transaction data
+ */
+async function fetchWalletTransactions() {
+  const results = [];
+  for (const txHash of TRANSACTIONS) {
+    const tx = await fetchTransaction(txHash);
+    if (tx) {
+      results.push({
+        id: txHash.slice(2, 10),
+        txHash: txHash,
+        blockNumber: tx.blockNumber || 'pending',
+        timestamp: tx.timeStamp ? new Date(parseInt(tx.timeStamp) * 1000).toISOString() : 'Unknown',
+        from: tx.from,
+        to: tx.to,
+        value: tx.value ? (parseInt(tx.value) / 1e18).toFixed(4) : '0',
+        gasUsed: tx.gasUsed,
+        gasPrice: tx.gasPrice,
+        status: tx.txreceipt_status === '1' ? 'verified' : 'pending',
+        method: tx.functionName || 'Contract Call',
+        confirmation: tx.confirmations || '0'
+      });
+    }
+  }
+  return results;
+}
+
+// ===================== DATA =====================
+// Will be populated from on-chain data
+let proofs = [];
 let expandedProofs = new Set();
 
 // ===================== HELPERS =====================
@@ -730,6 +706,7 @@ function renderProofs() {
       <div class="empty-state">
         <div class="empty-icon">&#x2713;</div>
         <p>No proofs match the current filters.</p>
+        <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">Connect wallet to load on-chain data</p>
       </div>`;
     return;
   }
@@ -738,90 +715,86 @@ function renderProofs() {
     const isExpanded = expandedProofs.has(proof.id);
     const statusClass = proof.status;
     const statusLabel = proof.status === 'verified' ? '\u2713 Verified On-Chain'
-                      : proof.status === 'pending' ? '\u23F3 Generating...'
+                      : proof.status === 'pending' ? '\u23F3 Pending'
                       : '\u2717 Failed';
-    const approvalStyle = proof.approval === 'Ledger Approved' ? ' class="detail-value amber"' : ' class="detail-value"';
-
+    
+    // For on-chain tx data
+    const isContractCreation = !proof.to || proof.to === '0x';
+    const methodDisplay = isContractCreation ? 'Contract Creation' : (proof.method || 'Contract Call');
+    const valueDisplay = proof.value ? `${proof.value} OG` : '0 OG';
+    
     let expandableHTML = '';
-    if (proof.status === 'verified') {
-      const checksHTML = proof.policyChecks.map(c => `
-        <li class="policy-check">
-          <div class="check-icon pass">\u2713</div>
-          <div>
-            <div class="check-rule">${esc(c.rule)}</div>
-            <div class="check-details">${esc(c.detail)}</div>
-          </div>
-        </li>`).join('');
-
+    if (proof.txHash) {
       expandableHTML = `
         <div class="proof-expandable${isExpanded ? ' expanded' : ''}" id="expand-${esc(proof.id)}">
-          <ul class="policy-checks">${checksHTML}</ul>
-          <div class="code-block"><pre style="margin:0;white-space:pre-wrap;">${formatJson(proof.verifiedOutput)}</pre></div>
           <div class="chain-details">
             <div class="detail-item">
               <div class="detail-label">Transaction Hash</div>
-              <div class="hash-value">${esc(proof.txHash)}</div>
+              <div class="hash-value"><a href="https://chainscan-dev.0g.ai/tx/${esc(proof.txHash)}" target="_blank" style="color:var(--cyan);text-decoration:none;">${esc(proof.txHash)} &#x2197;</a></div>
             </div>
             <div class="detail-item">
               <div class="detail-label">Block Number</div>
               <div class="detail-value">${esc(proof.blockNumber)}</div>
             </div>
+            <div class="detail-item">
+              <div class="detail-label">From</div>
+              <div class="detail-value">${esc(proof.from ? proof.from.slice(0, 16) + '...' : 'Unknown')}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">To</div>
+              <div class="detail-value">${esc(isContractCreation ? 'Contract Creation' : (proof.to ? proof.to.slice(0, 16) + '...' : 'Unknown'))}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Value</div>
+              <div class="detail-value">${esc(valueDisplay)}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Gas Used</div>
+              <div class="detail-value">${esc(proof.gasUsed || 'Unknown')}</div>
+            </div>
           </div>
         </div>`;
     }
 
-    const pendingHTML = proof.status === 'pending' ? `
-      <div class="pending-message" id="pending-msg-${esc(proof.id)}">
-        <div class="spinner"></div>
-        Proof generation in progress via Boundless proving marketplace...
-      </div>` : '';
-
-    const expandBtnHTML = proof.status === 'verified' ? `
+    const expandBtnHTML = proof.txHash ? `
       <button class="expand-btn${isExpanded ? ' open' : ''}" onclick="toggleExpand('${esc(proof.id)}')" aria-expanded="${isExpanded ? 'true' : 'false'}">
-        <span class="arrow">\u25BC</span> ${isExpanded ? 'Hide Details' : 'Show Details'}
+        <span class="arrow">\u25BC</span> ${isExpanded ? 'Hide Details' : 'Show On-Chain Data'}
       </button>` : '';
 
     return `
-      <div class="proof-card" role="listitem" data-proof-id="${esc(proof.id)}" data-agent="${esc(proof.agent)}" data-status="${esc(proof.status)}" data-action="${esc(proof.action)}">
+      <div class="proof-card" role="listitem" data-proof-id="${esc(proof.id)}" data-agent="${esc(proof.agent || 'unknown')}" data-status="${esc(proof.status)}" data-action="${esc(proof.action || 'unknown')}">
         <div class="proof-header">
-          <div class="proof-id">Proof #${esc(proof.id)}</div>
+          <div class="proof-id">${isContractCreation ? 'Contract Deployment' : 'Transaction'} #${esc(proof.id)}</div>
           <div class="proof-status ${esc(statusClass)}">${statusLabel}</div>
         </div>
         <div class="proof-details-grid">
           <div class="detail-item">
-            <div class="detail-label">Agent ID</div>
-            <div class="detail-value">${esc(proof.agent)}</div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-label">Action</div>
-            <div class="detail-value">${esc(proof.action)}</div>
+            <div class="detail-label">Method</div>
+            <div class="detail-value">${esc(methodDisplay)}</div>
           </div>
           <div class="detail-item">
             <div class="detail-label">Value</div>
-            <div class="detail-value">${esc(proof.value)} ${esc(proof.currency)}</div>
+            <div class="detail-value">${esc(valueDisplay)}</div>
           </div>
           <div class="detail-item">
-            <div class="detail-label">Approval Type</div>
-            <div${approvalStyle}>${esc(proof.approval)}</div>
+            <div class="detail-label">Block</div>
+            <div class="detail-value">${esc(proof.blockNumber || 'Pending')}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Confirmations</div>
+            <div class="detail-value">${esc(proof.confirmation || '0')}</div>
           </div>
           <div class="detail-item">
             <div class="detail-label">Timestamp</div>
-            <div class="detail-value">${esc(proof.timestamp)}</div>
+            <div class="detail-value">${esc(proof.timestamp || 'Unknown')}</div>
           </div>
           <div class="detail-item">
-            <div class="detail-label">Proof Time</div>
-            <div class="detail-value" id="proofTime-${esc(proof.id)}">${esc(proof.proofTime)}</div>
-          </div>
-        </div>
-        <div class="commitment-row">
-          <div class="detail-item">
-            <div class="detail-label">Output Commitment</div>
-            <div class="hash-value">${esc(proof.commitment)}</div>
+            <div class="detail-label">Network</div>
+            <div class="detail-value" style="color:var(--cyan);">0G Testnet</div>
           </div>
         </div>
         ${expandBtnHTML}
         ${expandableHTML}
-        ${pendingHTML}
       </div>`;
   }).join('');
 
@@ -920,31 +893,49 @@ document.getElementById('topAgentFilter').addEventListener('change', function() 
 document.getElementById('filterStatus').addEventListener('change', renderProofs);
 document.getElementById('filterAction').addEventListener('change', renderProofs);
 
-// ===================== SIMULATE PROOF COMPLETION =====================
-setTimeout(() => {
-  const pending = proofs.find(p => p.id === '1236');
-  if (pending && pending.status === 'pending') {
-    pending.status = 'verified';
-    pending.proofTime = '15s (Boundless)';
-    pending.proofTimeNum = 15;
-    pending.verifiedOutput = {
-      agent_id: 'alice-agent',
-      policy_hash: '0x1234...5678',
-      output_commitment: '0x5678...ef34',
-      all_checks_passed: true,
-      requires_ledger_approval: false,
-      action_value: 0
-    };
-    pending.txHash = '0xaabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344';
-    pending.blockNumber = '12,345,700';
-    renderProofs();
+// ===================== LOAD ON-CHAIN DATA =====================
+async function loadOnChainData() {
+  const container = document.getElementById('proofsContainer');
+  container.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">&#x23F3;</div>
+      <p>Loading on-chain data from 0G Testnet...</p>
+      <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">Fetching transactions from explorer</p>
+    </div>`;
+  
+  try {
+    const txs = await fetchWalletTransactions();
+    if (txs.length > 0) {
+      proofs = txs.map(tx => ({
+        ...tx,
+        agent: 'deployed-agent',
+        action: tx.method || 'contract_call'
+      }));
+      populateAgentFilters();
+      renderProofs();
+    } else {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">&#x26A0;</div>
+          <p>No transactions found</p>
+          <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">Could not fetch data from 0G Testnet explorer</p>
+        </div>`;
+    }
+  } catch (error) {
+    console.error('Failed to load on-chain data:', error);
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">&#x2717;</div>
+        <p>Failed to load on-chain data</p>
+        <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;">${esc(error.message)}</p>
+      </div>`;
   }
-}, 5000);
+}
 
 // ===================== INIT =====================
 populateAgentFilters();
 applyUrlParams();
-renderProofs();
+loadOnChainData(); // Fetch real data instead of using mock data
 </script>
 <script src="poc-api.js"></script>
 </body>
